@@ -60,6 +60,13 @@ if (!repo) {
   process.exit(1);
 }
 
+/**
+ * 推送目标:优先用远程名 origin 而不是 URL。
+ * 推到裸 URL 时 git 不会更新 origin/main 这个跟踪引用,之后 git status 会一直显示
+ * "ahead 1",容易误判。用远程名就没这个问题(认证头对两者同样生效)。
+ */
+const pushRemote = process.env.BLOG_REPO ? repo : 'origin';
+
 /* ---------- git 调用 ---------- */
 
 const gitEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
@@ -110,7 +117,7 @@ if (skipSource) {
 
     gitRun(['add', '-A']);
     gitRun([...AUTHOR, 'commit', '-q', '-m', message]);
-    gitRun(['push', '-q', repo, `${branch}:${branch}`], authArgs);
+    gitRun(['push', '-q', pushRemote, `${branch}:${branch}`], authArgs);
     console.log(`  ✓ 已推送到 ${branch}:${message}`);
   }
 }
