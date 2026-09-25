@@ -21,9 +21,13 @@
 .
 ├── _config.yml               # 站点配置(标题、导航、分页、RSS)
 ├── package.json              # "hexo" 字段是必需的,hexo-cli 靠它识别站点根目录
+├── mdblog/                   # 随手写的笔记放这里,部署时自动变成文章
+│   ├── _说明.md              # 以下划线开头 → 同步时跳过
+│   └── 数学/fibonacci-golden-ratio.md
 ├── source/
-│   ├── _posts/               # 文章,一篇一个 .md
+│   ├── _posts/               # 文章:手写的 + mdblog/ 生成的都在这里
 │   ├── _data/projects.yml    # 项目清单,首页和 /projects/ 都读它
+│   ├── images/mdblog/        # mdblog 笔记里引用的图片(同步时自动搬过来)
 │   ├── media/                # 背景视频 / 图片(npm run wallpaper 导入)
 │   ├── about/index.md        # 关于页
 │   └── projects/index.md     # 项目页
@@ -45,6 +49,7 @@
 │   ├── deploy.mjs            # 部署到 gh-pages
 │   ├── check.mjs             # 构建产物自检
 │   ├── verify-live.mjs       # 线上站点验证
+│   ├── sync-mdblog.mjs       # mdblog/ → source/_posts/ 同步
 │   ├── import-wallpaper.mjs  # 从 Wallpaper Engine 导入壁纸当背景
 │   ├── import-avatar.mjs     # 从 B 站同步头像 / 网站图标
 │   ├── manage-projects.mjs   # 项目清单校验与生成
@@ -78,6 +83,7 @@ npm install --ignore-scripts
 | `npm run verify` | 部署后验证线上站点(页面 + 静态资源是否真的可达) |
 | `npm run wallpaper -- 2903241954` | 从 Wallpaper Engine 导入壁纸当背景 |
 | `npm run wallpaper -- --list` | 列出本机所有 Wallpaper Engine 壁纸 |
+| `npm run mdblog` | 把 `mdblog/` 里的笔记同步成文章 |
 | `npm run projects -- check` | 校验项目清单(揪出私有仓库) |
 | `npm run projects -- list` | 列出所有公开仓库及收录状态 |
 | `npm run projects -- add <仓库名>` | 从 GitHub 生成一条项目清单骨架 |
@@ -402,6 +408,56 @@ rm -f db.json && npm run build
 | 国内网络 | 无影响 | 要能访问 CDN,或自己托管 |
 
 博客场景里 90% 的需求是"**看到**真实输出",构建期执行就够了。真要上 Pyodide,务必做成**点按钮才加载**,别让不想跑的人陪着下十几 MB。
+
+## 随手写笔记:`mdblog/` 文件夹
+
+`mdblog/` 里的所有 Markdown 都会在 `npm run deploy` 时**自动转换成博客文章**。
+
+```bash
+# 1. 往 mdblog/ 里丢一个 .md(可以建子文件夹)
+# 2. 正常写 Markdown,不用写 front-matter
+# 3. 发布
+npm run deploy
+```
+
+| 你写的 | 自动变成 |
+| --- | --- |
+| 正文第一个 `# 标题` | 文章标题(那一行会从正文里去掉,避免出现两个大标题) |
+| 没写 `# 标题` | 用文件名当标题 |
+| 文件修改时间 | 文章日期 |
+| 子目录名 | 分类:`mdblog/数学/xxx.md` → 分类「数学」 |
+| 相对路径的图片 | 复制到 `source/images/mdblog/<slug>/` 并改写路径 |
+| 文件名 | 网址:`mdblog/数学/fibonacci.md` → `posts/fibonacci/` |
+
+想自己指定就加 front-matter(写了以你写的为准,**其余字段原样保留**,包括多行 `tags:` 和自定义字段):
+
+```markdown
+---
+title: 自定义标题
+date: 2026-09-25 20:00:00
+categories: 随笔
+tags: [Hexo, 笔记]
+slug: my-own-url        # 自定义网址
+---
+```
+
+### 单独跑同步
+
+```bash
+npm run mdblog               # 只同步,不构建不发布
+npm run mdblog -- --dry-run  # 只看会做什么,不落盘
+```
+
+`npm run build` / `npm run check` / `npm run deploy` 都会自动先跑一次,平时不用手动执行。
+
+### 规则
+
+- **单向同步。** `mdblog/` 是源;生成到 `source/_posts/` 的文章带 `mdblog_source:` 标记,
+  是生成物,**改了会被下一次同步覆盖**。
+- **手写文章不受影响。** 直接写在 `source/_posts/` 里的文章没有那个标记,同步时绝不会被碰。
+- **删掉即下线。** 从 `mdblog/` 删掉一篇,对应文章也会被删掉(git 里能找回)。
+- **`_` 和 `.` 开头的文件/文件夹会被跳过**,用来放说明和草稿(比如 `mdblog/_说明.md`)。
+- 笔记里同样能用 `exec` 代码格和 `$公式$`,和正常文章没区别。
 
 ## 部署
 
