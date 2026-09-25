@@ -95,7 +95,4 @@
   </div>
 </article>
 
-<% if (page.math) { %>
-<script defer src="<%= url_for('/vendor/katex/katex.min.js') %>"></script>
-<script defer src="<%= url_for('/vendor/katex/auto-render.min.js') %>"></script>
-<% } %>
+<%# 公式已经在构建期由 scripts/math.js 渲染成静态 HTML,前端不需要再下载 KaTeX 脚本 %>

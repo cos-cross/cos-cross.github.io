@@ -22,6 +22,9 @@
   var avatarUrl = full_url_for(theme.profile.avatar);
   var favicon = theme.profile.favicon || '/img/favicon.svg';
   var faviconType = /\.svg$/i.test(favicon) ? 'image/svg+xml' : 'image/png';
+  // 正文里出现 KaTeX 渲染结果(scripts/math.js 在构建期生成)才引入公式样式。
+  // 这样不需要作者记得加 math: true —— 之前就是因为忘了加,公式一直没渲染出来。
+  var needMath = page.math || (page.content && String(page.content).indexOf('class="katex') !== -1);
 %>
 <head>
   <meta charset="utf-8">
@@ -47,7 +50,7 @@
   <% } %>
   <link rel="alternate" type="application/atom+xml" title="<%= config.title %>" href="<%= url_for('/atom.xml') %>">
   <link rel="stylesheet" href="<%= url_for('/css/style.css') %>">
-  <% if (page.math) { %>
+  <% if (needMath) { %>
   <link rel="stylesheet" href="<%= url_for('/vendor/katex/katex.min.css') %>">
   <% } %>
 </head>

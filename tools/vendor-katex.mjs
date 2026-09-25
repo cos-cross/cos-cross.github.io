@@ -1,11 +1,12 @@
 /**
- * 把 KaTeX 的运行时资源从 node_modules 复制到主题里。
+ * 把 KaTeX 的样式与字体复制到主题里。
  *
- * 只复制 woff2 字体:KaTeX 的 CSS 里同时声明了 woff2 / woff / ttf,
- * 现代浏览器命中第一个就停了,后面两个只会在老浏览器上才请求。
- * 全量复制会让仓库多出几百 KB 的无用字体。
+ * 只复制 CSS + woff2 字体:公式是在**构建期**由 scripts/math.js 渲染成静态 HTML 的,
+ * 前端不需要 katex.min.js / auto-render.js(那是浏览器端渲染才要的,266 KB)。
+ * 字体也只复制 woff2 —— KaTeX 的 CSS 里同时声明了 woff2 / woff / ttf,
+ * 现代浏览器命中第一个就停了,全量复制只会让仓库多出几百 KB 无用文件。
  *
- * 用法:node scripts/vendor-katex.mjs
+ * 用法:node tools/vendor-katex.mjs
  */
 import { cp, mkdir, readdir, rm, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -24,15 +25,7 @@ if (!existsSync(src)) {
 await rm(dest, { recursive: true, force: true });
 await mkdir(path.join(dest, 'fonts'), { recursive: true });
 
-const files = [
-  ['katex.min.css', 'katex.min.css'],
-  ['katex.min.js', 'katex.min.js'],
-  [path.join('contrib', 'auto-render.min.js'), 'auto-render.min.js'],
-];
-
-for (const [from, to] of files) {
-  await cp(path.join(src, from), path.join(dest, to));
-}
+await cp(path.join(src, 'katex.min.css'), path.join(dest, 'katex.min.css'));
 
 let fontCount = 0;
 for (const name of await readdir(path.join(src, 'fonts'))) {
@@ -51,6 +44,6 @@ async function walk(dir) {
 }
 await walk(dest);
 
-console.log(`KaTeX 已复制到 themes/cos-cross/source/vendor/katex`);
-console.log(`  文件:3 个脚本/样式 + ${fontCount} 个 woff2 字体`);
-console.log(`  体积:${(bytes / 1024).toFixed(1)} KB`);
+console.log('KaTeX 样式已复制到 themes/cos-cross/source/vendor/katex');
+console.log(`  1 个 CSS + ${fontCount} 个 woff2 字体`);
+console.log(`  体积:${(bytes / 1024).toFixed(1)} KB(不再包含客户端 JS)`);

@@ -465,34 +465,9 @@
     });
   })();
 
-  /* ---------- 11. 数学公式(仅在文章声明 math: true 时) ---------- */
-  (function math() {
-    var content = $('#post-content');
-    if (!content) return;
-
-    function render() {
-      if (typeof window.renderMathInElement !== 'function') return;
-      try {
-        window.renderMathInElement(content, {
-          delimiters: [
-            { left: '$$', right: '$$', display: true },
-            { left: '\\[', right: '\\]', display: true },
-            { left: '$', right: '$', display: false },
-            { left: '\\(', right: '\\)', display: false }
-          ],
-          throwOnError: false
-        });
-      } catch (e) { /* 公式报错不影响正文 */ }
-    }
-
-    // KaTeX 用 defer 加载,会晚于本脚本执行,所以要等 DOM 就绪后再渲染。
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', render);
-    } else {
-      render();
-    }
-    window.addEventListener('load', render);
-  })();
+  /* ---------- 11. 数学公式 ----------
+     公式已经在构建期由 scripts/math.js 用 KaTeX 渲染成静态 HTML,
+     前端不需要再做任何事(也因此省掉了 266 KB 的 KaTeX 脚本下载)。 */
 
   /* ---------- 12. 外部链接加标识 ---------- */
   (function external() {
