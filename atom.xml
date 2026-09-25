@@ -38,18 +38,18 @@
     </author>
     <category term="数学" scheme="https://cos-cross.github.io/categories/%E6%95%B0%E5%AD%A6/"/>
     <content>
-      <![CDATA[<p>主包最近在学化学选修二的金属晶体<del>真的不是立体几何和图论课吗</del></p><p><del>莫老师讲课其实主包好多听不懂</del>,但其中金属原子的密置层堆积方式引起了主包的注意</p><p>其实主要是对莫老师上课提到的两个”难以计算”的数学问题很感兴趣:</p><ol><li>为什么金属原子在二维空间下的密置层堆积是相邻原子两两相切且每相邻三个相邻原子的核构成正三角形? (二维)</li><li>为什么金属原子在三维空间下的最密堆积是在俯视图中每两个相邻密置层,每个层的原子都与对应相对层的三个球心构成的正三角形,且两两相邻球之间相切的密置方式? (三维)</li><li>求三维情况下密置堆积的空间利用率。</li></ol><p>前两个问题看上去就很不简单, 这种组合几何题让主包望而却步, 感觉主包的数学水平不足以证明学习上面两个问题的讨论</p><blockquote><p>前面的区域, 以后再来探索吧</p></blockquote><p>但第三个问题却是第二个问题在极值时构造, 看上去难度肯定比前两个要简单不少</p><div class="plot" data-kind="3d" data-mount>  <div class="plot-bar">    <span class="plot-kind">3D 等值面 · (x-1)^2+y^2+z^2=3/4 · 1 个点</span>    <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>    <span class="plot-actions">      <button type="button" data-plot-action="reset">重置</button>      <button type="button" data-plot-action="save">存为 PNG</button>    </span>  </div>  <div class="plot-stage"><canvas></canvas></div>  <script type="application/json">{"items":[{"type":"implicit","expr":"(x-1)^2+y^2+z^2=3/4","constraints":[]},{"type":"point","x":1,"y":0,"z":0,"label":"","constraints":[]}],"opts":{"x":[-4,4],"y":[-4,4],"z":[-4,4],"grid":28}}</script>  <details class="plot-src"><summary>表达式</summary><pre>point(0, 0, sqrt(2))point(1, 0, 0)point(-1/2, sqrt(3)/2, 0)point(-1/2, -sqrt(3)/2, 0)(x-1)^2+y^2+z^2=3/4(x+1/2)^2+(y-sqrt(3)/2)^2+z^2=3/4(x+1/2)^2+(y+sqrt(3)/2)^2+z^2=3/4x^2+y^2+(z-sqrt(2))^2=3/4</pre></details></div>]]>
+      <![CDATA[<p>主包最近在学化学选修二的金属晶体<del>真的不是立体几何和图论课吗</del></p><p><del>莫老师讲课其实主包好多听不懂</del>,但其中金属原子的密置层堆积方式引起了主包的注意</p><p>其实主要是对莫老师上课提到的两个”难以计算”的数学问题很感兴趣:</p><ol><li>为什么金属原子在二维空间下的密置层堆积是相邻原子两两相切且每相邻三个相邻原子的核构成正三角形? (二维)</li><li>为什么金属原子在三维空间下的最密堆积是在俯视图中每两个相邻密置层,每个层的原子都与对应相对层的三个球心构成的正三角形,且两两相邻球之间相切的密置方式? (三维)</li><li>求三维情况下密置堆积的空间利用率。</li></ol><p>前两个问题看上去就很不简单, 这种组合几何题让主包望而却步, 感觉主包的数学水平不足以证明学习上面两个问题的讨论</p><blockquote><p>前面的区域, 以后再来探索吧</p></blockquote><p>但第三个问题却是第二个问题在极值时构造, 看上去难度肯定比前两个要简单不少</p><div class="plot" data-kind="3d" data-mount>  <div class="plot-bar">    <span class="plot-kind">3D 等值面 · (x-1)^2+y^2+z^2=3/4 · 1 个点</span>    <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>    <span class="plot-actions">      <button type="button" data-plot-action="reset">重置</button>      <button type="button" data-plot-action="save">存为 PNG</button>    </span>  </div>  <div class="plot-stage"><canvas></canvas></div>  <script type="application/json">{"items":[{"type":"implicit","expr":"(x-1)^2+y^2+z^2=3/4","constraints":[]},{"type":"point","x":1,"y":0,"z":0,"label":"B","constraints":[]}],"opts":{"x":[-4,4],"y":[-4,4],"z":[-4,4],"grid":28}}</script>  <details class="plot-src"><summary>表达式</summary><pre>point(0, 0, sqrt(2)) Apoint(1, 0, 0) Bpoint(-1/2, sqrt(3)/2, 0) Cpoint(-1/2, -sqrt(3)/2, 0) D(x-1)^2+y^2+z^2=3/4(x+1/2)^2+(y-sqrt(3)/2)^2+z^2=3/4(x+1/2)^2+(y+sqrt(3)/2)^2+z^2=3/4x^2+y^2+(z-sqrt(2))^2=3/4</pre></details></div>]]>
     </content>
     <id>https://cos-cross.github.io/posts/%E7%94%B1%E5%8C%96%E5%AD%A6%E7%9F%A5%E8%AF%86%E7%82%B9%E6%83%B3%E5%88%B0%E7%9A%84%E6%95%B0%E5%AD%A6%E9%A2%98/</id>
     <link href="https://cos-cross.github.io/posts/%E7%94%B1%E5%8C%96%E5%AD%A6%E7%9F%A5%E8%AF%86%E7%82%B9%E6%83%B3%E5%88%B0%E7%9A%84%E6%95%B0%E5%AD%A6%E9%A2%98/"/>
-    <published>2026-09-25T06:13:29.000Z</published>
+    <published>2026-09-25T06:14:51.000Z</published>
     <summary>
       <![CDATA[<p>主包最近在学化学选修二的金属晶体<del>真的不是立体几何和图论课吗</del></p>
 <p><del>莫老师讲课其实主包好多听不懂</del>,但其中金属原子的密置层堆积方式引起了主包的注意</p>
 <p>其实主要是对莫老师上课提到的两个”难以计算”的数学问题很感兴趣:]]>
     </summary>
     <title>由一个化学知识点想到的数学题 -- 立体角和球面三角形</title>
-    <updated>2026-09-25T06:13:37.634Z</updated>
+    <updated>2026-09-25T06:14:54.267Z</updated>
   </entry>
   <entry>
     <author>
