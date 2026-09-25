@@ -72,7 +72,8 @@ git(['add', '-A']);
 git(
   ['-c', 'user.name=Cos-Cross', '-c', 'user.email=coscross@126.com', 'commit', '-q', '-m', `deploy: ${stamp}`],
 );
-git(['push', '-q', '-f', ...authArgs, repo, `${BRANCH}:${BRANCH}`]);
+// 注意:-c 是 git 的全局选项,必须排在 push 子命令之前
+git(['push', '-q', '-f', repo, `${BRANCH}:${BRANCH}`], authArgs);
 
 console.log(`\n完成。提交时间 ${stamp}`);
 console.log('如果这是第一次发布,记得在仓库 Settings → Pages 里把发布源切到 gh-pages 分支。');
