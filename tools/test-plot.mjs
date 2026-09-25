@@ -210,6 +210,107 @@ ok('隐式式子里未知符号照样报错', (() => {
   try { Kit.compileImplicit('x^2 + q^2 = 1', ['x', 'y']); return false; } catch (e) { return /未知符号/.test(e.message); }
 })());
 
+console.log('\n=== 约束条件 ===');
+function testC(src, vars, at) {
+  const t = Kit.compileConstraint(src, vars);
+  const scope = Kit.makeScope(vars);
+  Object.assign(scope, at);
+  return t(scope);
+}
+ok('x < y 当 (1,2) → 真', testC('x < y', ['x', 'y'], { x: 1, y: 2 }) === true);
+ok('x < y 当 (2,1) → 假', testC('x < y', ['x', 'y'], { x: 2, y: 1 }) === false);
+ok('x < y 当 (1,1) → 假(严格)', testC('x < y', ['x', 'y'], { x: 1, y: 1 }) === false);
+ok('x <= y 当 (1,1) → 真(含等号)', testC('x <= y', ['x', 'y'], { x: 1, y: 1 }) === true);
+ok('x >= y 当 (1,1) → 真', testC('x >= y', ['x', 'y'], { x: 1, y: 1 }) === true);
+ok('x > y 当 (1,2) → 假', testC('x > y', ['x', 'y'], { x: 1, y: 2 }) === false);
+ok('x + y < z 三个变量', testC('x + y < z', ['x', 'y', 'z'], { x: 1, y: 1, z: 3 }) === true);
+ok('x + y < z 不满足时', testC('x + y < z', ['x', 'y', 'z'], { x: 2, y: 2, z: 3 }) === false);
+ok('z > 0 当 z=-1 → 假', testC('z > 0', ['x', 'y', 'z'], { x: 0, y: 0, z: -1 }) === false);
+ok('<= 不会被误认成 <', testC('y <= 0', ['x', 'y'], { x: 0, y: 0 }) === true);
+ok('约束里未知符号会报错', (() => {
+  try { Kit.compileConstraint('x < q', ['x', 'y']); return false; } catch (e) { return /未知符号/.test(e.message); }
+})());
+ok('parseConstraint 认不出比较符号时返回 null', Kit.parseConstraint('x + y') === null);
+ok('比较符号两边不能为空', (() => {
+  try { Kit.parseConstraint('x <'); return false; } catch { return true; }
+})());
+
+console.log('\n=== 约束如何裁剪图形 ===');
+// 2D 显式曲线:只有 x < 0 的那半段
+const masked2d = Kit.compute2D(['sin(x)'], {
+  x: [-Math.PI, Math.PI], samples: 100, mask: Kit.makeMask([Kit.compileConstraint('x < 0', ['x', 'y'])]),
+});
+const kept = masked2d.series[0].filter((p) => p.y !== null).length;
+ok('半边约束把曲线裁掉一半', kept > 40 && kept < 60, `保留 ${kept}/101 点`);
+ok('保留的点都满足 x < 0', masked2d.series[0].every((p) => p.y === null || p.x < 0));
+
+// 隐式曲线:单位圆上 x < y 的弧
+const arc = Kit.marchingSquares(
+  Kit.compileImplicit('x^2 + y^2 = 1', ['x', 'y']),
+  { x: [-2, 2], y: [-2, 2], nx: 170, ny: 170, mask: Kit.makeMask([Kit.compileConstraint('x < y', ['x', 'y'])]) },
+);
+ok('圆弧被裁出来了', arc.length > 50, `${arc.length} 段`);
+ok('弧上的点都满足 x < y', arc.every((s) => s.every((p) => p.x < p.y + 1e-6)));
+// x<y 在单位圆上对应 θ ∈ (π/4, 5π/4) —— 注意它确实跨过 π,所以不能用"最大角"当判据
+const arcAngles = arc.flat().map((p) => Math.atan2(p.y, p.x));
+ok('弧只覆盖 θ∈(π/4, 5π/4)', arcAngles.every((a) => a > Math.PI / 4 - 0.02 || a < -3 * Math.PI / 4 + 0.02),
+  `${arcAngles.filter((a) => a > Math.PI / 4 - 0.02 || a < -3 * Math.PI / 4 + 0.02).length}/${arcAngles.length}`);
+
+// 3D 等值面:z > 0 的上半球
+const hemi = Kit.surfaceNets(
+  Kit.compileImplicit('x^2 + y^2 + z^2 = 1', ['x', 'y', 'z']),
+  { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 30, mask: Kit.makeMask([Kit.compileConstraint('z > 0', ['x', 'y', 'z'])]) },
+);
+const full = Kit.surfaceNets(
+  Kit.compileImplicit('x^2 + y^2 + z^2 = 1', ['x', 'y', 'z']),
+  { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 30 },
+);
+ok('上半球顶点数约为整球的一半', hemi.verts.length > full.verts.length * 0.4
+  && hemi.verts.length < full.verts.length * 0.6,
+  `${hemi.verts.length} vs 整球 ${full.verts.length}`);
+// 归一化坐标里 y 是数学的 z(高度),所以上半球的 y 应该 >= 0
+ok('上半球的顶点高度都 >= 0', hemi.verts.every((v) => v.y >= -0.02));
+
+// 3D 显式曲面:被 x*x + y*y < 1 限制在一个圆盘里
+const disk = Kit.buildSurface('sin(x)*cos(y)', {
+  x: [-3, 3], y: [-3, 3], grid: 24, mask: Kit.makeMask([Kit.compileConstraint('x^2 + y^2 < 1', ['x', 'y', 'z'])]),
+});
+const inside = [];
+for (let i = 0; i <= 24; i += 1) for (let j = 0; j <= 24; j += 1) {
+  const p = disk.grid[i][j];
+  if (Number.isFinite(p.z)) inside.push(p);
+}
+ok('曲面被裁剪成圆盘', inside.length > 20 && inside.length < 24 * 24, `保留 ${inside.length} 个网格点`);
+ok('保留下来的网格点都在圆盘内', inside.every((p) => {
+  const x = (p.ux) * 3, y = (p.uy) * 3; // ux/uy 是归一化到 [-1,1] 的
+  return x * x + y * y < 1.4;
+}));
+
+console.log('\n=== 区域与单独的点 ===');
+const region = Kit.regionCells(
+  Kit.makeMask([Kit.compileConstraint('x^2 + y^2 < 1', ['x', 'y'])]),
+  { x: [-2, 2], y: [-2, 2], nx: 120, ny: 120 },
+);
+ok('单位圆盘区域格子数接近 πr²/(面积/格)', region.length > 2700 && region.length < 2900, `${region.length} 格`);
+ok('区域内格子中心都在圆内', region.every((c) => {
+  const cx = c[0] + c[2] / 2;
+  const cy = c[1] + c[3] / 2;
+  return cx * cx + cy * cy < 1;
+}));
+
+const pts = Kit.parsePoints('point(1, 2) A point(pi/2, 1) B point(0,0,3) C', []);
+ok('解析出 3 个点', pts.length === 3, `${pts.length} 个`);
+ok('坐标求值正确(含 pi/2)', Math.abs(pts[1].x - Math.PI / 2) < 1e-12);
+ok('标签解析正确', pts[0].label === 'A' && pts[1].label === 'B' && pts[2].label === 'C');
+ok('三维点带 z 坐标', pts[2].z === 3);
+ok('不带标签也可以', Kit.parsePoints('point(0, 0)', [])[0].label === '');
+ok('点是常量表达式,不能用 x', (() => {
+  try { Kit.parsePoints('point(x, 1)', []); return false; } catch (e) { return /未知符号/.test(e.message); }
+})());
+ok('点少于两个坐标会报错', (() => {
+  try { Kit.parsePoints('point(1)', []); return false; } catch { return true; }
+})());
+
 console.log('\n=== 刻度与配色 ===');
 ok('niceStep 给出整齐的步长', [Kit.niceStep(10, 8), Kit.niceStep(1, 8), Kit.niceStep(1000, 5)]
   .every((v) => { const m = v / 10 ** Math.round(Math.log10(v)); return [1, 2, 5].some((k) => near(m, k) || near(m * 10, k)); }));

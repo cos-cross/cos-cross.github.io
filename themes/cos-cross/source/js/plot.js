@@ -235,6 +235,112 @@
     return compileAst({ t: 'bin', op: '-', a: parse(eq.lhs), b: parse(eq.rhs) }, allowedVars);
   }
 
+  /**
+   * 约束条件(x < y、x+y <= z 这种)。
+   *
+   * 统一归一化成 "g > 0" 或 "g >= 0":
+   *   a <  b   →  b - a > 0
+   *   a >  b   →  a - b > 0
+   *   a <= b   →  b - a >= 0
+   * 这样判断就只剩一个符号问题,不用为四种写法各写一遍分支。
+   *
+   * 注意比较符号的匹配顺序:必须先看 <= / >=,否则会被当成 "<" 或 ">" 加个等号。
+   */
+  function parseConstraint(src) {
+    const m = String(src).match(/<=|>=|<|>/);
+    if (!m) return null;
+    const lhs = src.slice(0, m.index).trim();
+    const rhs = src.slice(m.index + m[0].length).trim();
+    if (!lhs || !rhs) throw new Error('比较符号两边都要有式子:' + src);
+    return { op: m[0], lhs, rhs };
+  }
+
+  function compileConstraint(src, allowedVars) {
+    const c = parseConstraint(src);
+    if (!c) throw new Error('不是约束条件:' + src);
+    const leftFirst = c.op === '>' || c.op === '>=';
+    const ast = {
+      t: 'bin',
+      op: '-',
+      a: parse(leftFirst ? c.lhs : c.rhs),
+      b: parse(leftFirst ? c.rhs : c.lhs),
+    };
+    const fn = compileAst(ast, allowedVars);
+    const inclusive = c.op.length === 2;
+    const test = function (scope) {
+      const v = fn(scope);
+      if (!Number.isFinite(v)) return false;
+      return inclusive ? v >= 0 : v > 0;
+    };
+    test.source = src;
+    return test;
+  }
+
+  /** 全部约束都满足才算通过 */
+  function makeMask(tests) {
+    if (!tests || !tests.length) return null;
+    return function (scope) {
+      for (let i = 0; i < tests.length; i++) {
+        if (!tests[i](scope)) return false;
+      }
+      return true;
+    };
+  }
+
+  /**
+   * 单独的点,坐标在**构建期**就求好(写成字符串带过来,浏览器端不重复解析)。
+   * 支持 point(1, 2) / point(1, 2, 3),后面可以跟一个标签:point(1,2) A
+   */
+  const POINT_RE = /point\s*\(\s*([^,()]+)\s*,\s*([^,()]+)\s*(?:,\s*([^,()]+)\s*)?\)\s*([^\s(<]*)?/g;
+
+  function parsePoints(src, allowedVars) {
+    const out = [];
+    const re = new RegExp(POINT_RE.source, 'g');
+    let m;
+    while ((m = re.exec(src))) {
+      const scope = makeScope([]);
+      const coords = [m[1], m[2], m[3]].filter((v) => v !== undefined && v !== '');
+      const vals = coords.map((c) => {
+        const fn = compileAst(parse(c), []); // 点的坐标只能是常量表达式
+        const v = fn(scope);
+        if (!Number.isFinite(v)) throw new Error('点的坐标算不出有限值:' + c);
+        return v;
+      });
+      if (vals.length < 2) throw new Error('点至少需要两个坐标:' + m[0]);
+      out.push({ x: vals[0], y: vals[1], z: vals.length > 2 ? vals[2] : 0, label: (m[4] || '').trim() });
+    }
+    // 写了 point( 但一个都没解析出来 —— 比如 point(1) 少了个坐标 ——
+    // 这时候静默返回空列表最糟:作者以为画上了,结果什么都没有。
+    const written = (String(src).match(/point\s*\(/gi) || []).length;
+    if (written > out.length) {
+      throw new Error('点的坐标没写对,应该形如 point(1, 2) 或 point(1, 2, 3):' + src.trim());
+    }
+    return out;
+  }
+
+  /**
+   * 只给约束条件时,把满足条件的格子收集起来画成"区域"。
+   * 一次性塞进同一条路径再 fill,叠加处不会出现两次半透明的接缝。
+   */
+  function regionCells(mask, opts) {
+    const nx = Math.max(20, Math.min(300, opts.nx || 150));
+    const ny = Math.max(20, Math.min(300, opts.ny || 150));
+    const x0 = opts.x[0], x1 = opts.x[1], y0 = opts.y[0], y1 = opts.y[1];
+    const dx = (x1 - x0) / nx;
+    const dy = (y1 - y0) / ny;
+    const scope = makeScope(['x', 'y']);
+    const cells = [];
+    for (let i = 0; i < nx; i++) {
+      scope.x = x0 + dx * (i + 0.5);
+      for (let j = 0; j < ny; j++) {
+        scope.y = y0 + dy * (j + 0.5);
+        if (!mask(scope)) continue;
+        cells.push([x0 + dx * i, y0 + dy * j, dx, dy]);
+      }
+    }
+    return cells;
+  }
+
   /** 建一个带常量/函数原型的求值作用域(每次求值只改 x/y,避免反复建对象) */
   function makeScope(vars) {
     var scope = Object.create(FUNCTIONS);
@@ -250,18 +356,21 @@
   function compute2D(exprs, opts) {
     opts = opts || {};
     var fns = exprs.map(function (e) { return compile(e, ['x']); });
-    var scope = makeScope(['x']);
+    var scope = makeScope(['x', 'y']);
     var n = opts.samples || 720;
     var x0 = opts.x[0];
     var x1 = opts.x[1];
+    var mask = opts.mask || null;
     var series = fns.map(function (fn) {
       var pts = [];
       for (var i = 0; i <= n; i++) {
         var x = x0 + (x1 - x0) * (i / n);
         scope.x = x;
         var y = fn(scope);
-        // 非有限值断开,避免 1/x 这种在 0 附近连出一条竖线
-        pts.push(Number.isFinite(y) ? { x: x, y: y } : { x: x, y: null });
+        scope.y = y;
+        // 约束条件不满足的地方直接断开,曲线就不会画到区域外面去
+        var ok = Number.isFinite(y) && (!mask || mask(scope));
+        pts.push(ok ? { x: x, y: y } : { x: x, y: null });
       }
       return pts;
     });
@@ -275,9 +384,10 @@
   function buildSurface(expr, opts) {
     opts = opts || {};
     var fn = compile(expr, ['x', 'y']);
-    var scope = makeScope(['x', 'y']);
+    var scope = makeScope(['x', 'y', 'z']);
     var n = Math.max(4, Math.min(120, opts.grid || 44));
     var x0 = opts.x[0], x1 = opts.x[1], y0 = opts.y[0], y1 = opts.y[1];
+    var mask = opts.mask || null;
 
     var verts = [];
     var zmin = Infinity, zmax = -Infinity;
@@ -288,8 +398,10 @@
         scope.x = x0 + (x1 - x0) * (i / n);
         scope.y = y0 + (y1 - y0) * (j / n);
         var z = fn(scope);
-        if (!Number.isFinite(z)) z = NaN;
-        else { if (z < zmin) zmin = z; if (z > zmax) zmax = z; }
+        scope.z = z;
+        // 被约束排除的地方直接标成 NaN,引用到它的四边形会自动被丢掉
+        if (!Number.isFinite(z) || (mask && !mask(scope))) z = NaN;
+        if (Number.isFinite(z)) { if (z < zmin) zmin = z; if (z > zmax) zmax = z; }
         row.push({ x: scope.x, y: scope.y, z: z });
       }
       verts.push(row);
@@ -348,6 +460,7 @@
     const ny = Math.max(20, Math.min(400, opts.ny || 170));
     const x0 = opts.x[0], x1 = opts.x[1], y0 = opts.y[0], y1 = opts.y[1];
     const scope = makeScope(['x', 'y']);
+    const mask = opts.mask || null;
 
     const sample = (x, y) => {
       scope.x = x;
@@ -416,7 +529,15 @@
         }
       }
     }
-    return segs;
+    return segs.filter(function (s) {
+      if (!mask) return true;
+      // 两端都在允许区域里的线段才保留 —— 曲线会被约束条件干净地截断
+      const a = s[0], b = s[1];
+      scope.x = a.x; scope.y = a.y;
+      if (!mask(scope)) return false;
+      scope.x = b.x; scope.y = b.y;
+      return mask(scope);
+    });
   }
 
   /* ============================================================
@@ -446,6 +567,7 @@
     const m = n + 1;
 
     const scope = makeScope(['x', 'y', 'z']);
+    const mask = opts.mask || null;
     const at = (i, j, k) => ({ x: x0 + dx * i, y: y0 + dy * j, z: z0 + dz * k });
     const evalAt = (p) => {
       scope.x = p.x; scope.y = p.y; scope.z = p.z;
@@ -512,6 +634,13 @@
           const wx = x0 + dx * (i + sx / cnt);
           const wy = y0 + dy * (j + sy / cnt);
           const wz = z0 + dz * (k + sz / cnt);
+
+          // 约束条件在顶点处判断:不满足就不生成这个顶点,
+          // 引用它的四边形自然消失 —— 曲面被切掉一块(切口是格子级的锯齿)
+          if (mask) {
+            scope.x = wx; scope.y = wy; scope.z = wz;
+            if (!mask(scope)) continue;
+          }
 
           // 梯度当法线(中心差分)
           const h = Math.min(dx, dy, dz) * 0.35;
@@ -823,6 +952,34 @@
     var x2p = function (x) { return (x - view.x0) / (view.x1 - view.x0) * w; };
     var y2p = function (y) { return h - (y - view.y0) / (view.y1 - view.y0) * h; };
 
+    // 1) 只有约束条件时,先把满足条件的区域铺一层底色。
+    //    所有格子塞进同一条路径再 fill,叠加处不会出现两层半透明的接缝。
+    if (state.regionCells && state.regionCells.length) {
+      var sx = w / (view.x1 - view.x0);
+      var sy = h / (view.y1 - view.y0);
+      ctx.beginPath();
+      for (var ci = 0; ci < state.regionCells.length; ci++) {
+        var c = state.regionCells[ci];
+        ctx.rect(x2p(c[0]), y2p(c[1] + c[3]), c[2] * sx, c[3] * sy);
+      }
+      ctx.fillStyle = 'rgba(46, 230, 255, .13)';
+      ctx.fill();
+      // 区域边界再描一遍,比格子边缘干净
+      (state.regionBoundary || []).forEach(function (segs) {
+        ctx.beginPath();
+        for (var s = 0; s < segs.length; s++) {
+          ctx.moveTo(x2p(segs[s][0].x), y2p(segs[s][0].y));
+          ctx.lineTo(x2p(segs[s][1].x), y2p(segs[s][1].y));
+        }
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#2ee6ff';
+        ctx.shadowColor = '#2ee6ff';
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      });
+    }
+
     state.series.forEach(function (pts, si) {
       var color = state.colors[si % state.colors.length];
       ctx.lineWidth = 2.2;
@@ -865,6 +1022,34 @@
       ctx.stroke();
       ctx.shadowBlur = 0;
     });
+
+    // 3) 单独的点画在最上层(2D 没有遮挡问题)
+    drawPoints2D(ctx, state.points || [], x2p, y2p);
+  }
+
+  function drawPoints2D(ctx, points, x2p, y2p) {
+    points.forEach(function (p) {
+      var px = x2p(p.x);
+      var py = y2p(p.y);
+      ctx.beginPath();
+      ctx.arc(px, py, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffd166';
+      ctx.shadowColor = '#ffd166';
+      ctx.shadowBlur = 12;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = 'rgba(7, 7, 15, .85)';
+      ctx.stroke();
+
+      if (p.label) {
+        ctx.font = '600 12.5px ui-monospace, Consolas, monospace';
+        ctx.fillStyle = '#ffd166';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(p.label, px + 9, py - 6);
+      }
+    });
   }
 
   function render3D(ctx, canvas, state, theme) {
@@ -874,12 +1059,51 @@
     ctx.clearRect(0, 0, w, h);
 
     // 隐式曲面走网格那条路,显式高度场走原来的路
-    var quads = state.mesh
+    var items = state.mesh
       ? projectMeshQuads(state.mesh, state.cam, w, h, state)
       : buildQuads(state.surface, state.cam, w, h, state);
+    for (var qi = 0; qi < items.length; qi++) items[qi].kind = 'quad';
+
+    // 把点也塞进同一个深度序列 —— 这样球背面的点会被球正确地挡住
+    (state.points || []).forEach(function (p) {
+      var sp = project({ x: p.nx, y: p.ny, z: p.nz }, state.cam, w, h);
+      if (sp.depth <= 0.05) return;
+      items.push({
+        kind: 'point',
+        depth: sp.depth,
+        x: sp.x + (state.panX || 0),
+        y: sp.y + (state.panY || 0),
+        // 半径跟着透视缩放,靠近时自然变大
+        r: 5 * (state.cam.focal / sp.depth) * state.cam.zoom,
+        label: p.label,
+      });
+    });
+    items.sort(function (a, b) { return b.depth - a.depth; });
+
+    var quads = items;
 
     for (var i = 0; i < quads.length; i++) {
       var q = quads[i];
+      if (q.kind === 'point') {
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, Math.max(2.5, Math.min(14, q.r)), 0, Math.PI * 2);
+        ctx.fillStyle = '#ffd166';
+        ctx.shadowColor = '#ffd166';
+        ctx.shadowBlur = 12;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = 'rgba(7, 7, 15, .85)';
+        ctx.stroke();
+        if (q.label) {
+          ctx.font = '600 12.5px ui-monospace, Consolas, monospace';
+          ctx.fillStyle = '#ffd166';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(q.label, q.x + 9, q.y - 6);
+        }
+        continue;
+      }
       var rgb = colormap(q.t).match(/\d+/g);
       var m = q.light;
       // 用四边形法线算出的明暗系数调制颜色,曲面才有立体感
@@ -1011,28 +1235,60 @@
     }
 
     try {
+      // 约束条件:统一编译成"是否在允许区域内"的判定
+      const varNames = kind === '3d' ? ['x', 'y', 'z'] : ['x', 'y'];
+      const tests = (payload.constraints || []).map(function (c) {
+        return compileConstraint(c, varNames);
+      });
+      const mask = makeMask(tests);
+
       if (kind === '3d') {
+        const o = Object.assign({}, payload.opts, { mask: mask });
         if (payload.implicit) {
-          // f(x,y,z)=0 → 等值面网格
-          state.mesh = surfaceNets(compileImplicit(payload.expr, ['x', 'y', 'z']), payload.opts);
+          state.mesh = surfaceNets(compileImplicit(payload.expr, varNames), o);
         } else {
-          state.surface = buildSurface(payload.expr, payload.opts);
+          state.surface = buildSurface(payload.expr, o);
         }
-        state.cam = {
-          az: -0.62, el: 0.52, dist: 3.4,
-          focal: 3.4, zoom: 1,
-        };
+        state.cam = { az: -0.62, el: 0.52, dist: 3.4, focal: 3.4, zoom: 1 };
+
+        // 点从数学坐标换算到和曲面同一套归一化立方体里
+        const { x: [ax, bx], y: [ay, by], z: [az2, bz2] } = payload.opts;
+        const cx = (ax + bx) / 2, cy = (ay + by) / 2, cz = (az2 + bz2) / 2;
+        const scope = makeScope(['x', 'y', 'z']);
+        state.points = (payload.points || []).filter(function (p) {
+          if (!mask) return true;
+          scope.x = p.x; scope.y = p.y; scope.z = p.z;
+          return mask(scope);
+        }).map(function (p) {
+          return {
+            nx: (p.x - cx) / ((bx - ax) / 2 || 1),
+            ny: (p.z - cz) / ((bz2 - az2) / 2 || 1),
+            nz: (p.y - cy) / ((by - ay) / 2 || 1),
+            label: p.label,
+          };
+        });
       } else {
         state.exprs = payload.exprs || [];
-        // 隐式方程 f(x,y)=0 先编译好,缩放时重复采样不用重新解析
         state.implicitFns = (payload.implicit || []).map(function (e) {
           return compileImplicit(e, ['x', 'y']);
         });
+        state.constraints = tests;
+        state.mask = mask;
+        // 只给约束条件 = 画区域
+        state.regionOnly = !state.exprs.length && !state.implicitFns.length && Boolean(mask);
         state.implicitSegs = [];
+        state.regionCells = [];
+        state.regionBoundary = [];
         state.colors = COLORS;
-        var x0 = payload.opts.x[0], x1 = payload.opts.x[1];
-        state.view = { x0: x0, x1: x1, y0: -1, y1: 1 };
         state.opts = payload.opts;
+        // 点也要过一遍约束
+        const scope = makeScope(['x', 'y']);
+        state.points = (payload.points || []).filter(function (p) {
+          if (!mask) return true;
+          scope.x = p.x; scope.y = p.y;
+          return mask(scope);
+        });
+        state.view = { x0: payload.opts.x[0], x1: payload.opts.x[1], y0: -1, y1: 1 };
       }
     } catch (e) {
       fail(e.message);
@@ -1045,14 +1301,22 @@
       if (kind === '3d') return;
       var range = { x: [state.view.x0, state.view.x1], y: [state.view.y0, state.view.y1] };
       if (state.exprs.length) {
-        state.series = compute2D(state.exprs, { x: range.x, samples: 900 }).series;
+        state.series = compute2D(state.exprs, {
+          x: range.x, samples: 900, mask: state.mask,
+        }).series;
       } else {
         state.series = [];
       }
       // 等值线跟着视野重新采样,放大时才不会变成折线
       state.implicitSegs = state.implicitFns.map(function (fn) {
-        return marchingSquares(fn, { x: range.x, y: range.y, nx: 170, ny: 170 });
+        return marchingSquares(fn, { x: range.x, y: range.y, nx: 170, ny: 170, mask: state.mask });
       });
+      if (state.regionOnly && state.mask) {
+        state.regionCells = regionCells(state.mask, { x: range.x, y: range.y, nx: 150, ny: 150 });
+        state.regionBoundary = state.constraints.map(function (fn) {
+          return marchingSquares(fn, { x: range.x, y: range.y, nx: 170, ny: 170 });
+        });
+      }
     }
 
     function autoFitY() {
@@ -1267,6 +1531,11 @@
     surfaceNets: surfaceNets,
     parseEquation: parseEquation,
     compileImplicit: compileImplicit,
+    parseConstraint: parseConstraint,
+    compileConstraint: compileConstraint,
+    makeMask: makeMask,
+    parsePoints: parsePoints,
+    regionCells: regionCells,
     projectMeshQuads: projectMeshQuads,
     buildQuads: buildQuads,
     applyOrbit: applyOrbit,

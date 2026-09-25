@@ -192,30 +192,106 @@ hexo.extend.filter.register('after_post_render', function (data) {
     }
 
     const o = block.optsRaw;
-    // 含等号的当隐式方程处理,其余是显式函数
-    const equations = all.filter((s) => s.includes('='));
-    const explicit = all.filter((s) => !s.includes('='));
+    const vars = kind === '3d' ? ['x', 'y', 'z'] : ['x', 'y'];
 
-    // 构建期编译一遍:语法错、未知符号、等号写多了都在这里报出来
-    const validate = (src, vars) => {
+    // 按行分类。判断顺序很重要:点的写法最特殊先认,
+    // 然后是比较(<=/>= 里也含 "=",必须排在等号前面),最后才是等号和显式函数。
+    const points = [];
+    const constraints = [];
+    const equations = [];
+    const explicit = [];
+
+    /**
+     * `y = f(x)` / `z = f(x,y)` 这种"左边只有一个因变量"的等式,按显式函数处理。
+     * 效果一样,但显式走的是逐点采样,比 marching squares / surface nets 快得多,
+     * 而且不会因为"看起来像隐式"而把画布强行改成正方形。
+     */
+    function asExplicit(line, dep) {
+      const eq = Kit.parseEquation(line);
+      if (!eq.implicit) return null;
+      if (eq.lhs !== dep) return null;
+      let names;
       try {
-        if (src.includes('=')) Kit.compileImplicit(src, vars);
-        else Kit.compile(src, vars);
-      } catch (e) {
-        problems.push(`${data.source}:"${src}" —— ${e.message}`);
+        names = Kit.collectNames(Kit.parse(eq.rhs));
+      } catch {
+        return null;
       }
-    };
+      if (names.vars[dep]) return null; // 右边又出现因变量,那就是真隐式
+      return eq.rhs;
+    }
+
+    all.forEach((line) => {
+      if (/^point\s*\(/i.test(line)) {
+        try {
+          points.push(...Kit.parsePoints(line, []));
+        } catch (e) {
+          problems.push(`${data.source}:"${line}" —— ${e.message}`);
+        }
+      } else if (/<=|>=|<|>/.test(line)) {
+        try {
+          Kit.compileConstraint(line, vars);
+          constraints.push(line);
+        } catch (e) {
+          problems.push(`${data.source}:"${line}" —— ${e.message}`);
+        }
+      } else if (line.includes('=')) {
+        const dep = kind === '3d' ? 'z' : 'y';
+        const asFn = asExplicit(line, dep);
+        if (asFn !== null) {
+          try {
+            Kit.compile(asFn, kind === '3d' ? ['x', 'y'] : ['x']);
+            explicit.push(asFn);
+          } catch (e) {
+            problems.push(`${data.source}:"${line}" —— ${e.message}`);
+          }
+        } else {
+          try {
+            Kit.compileImplicit(line, kind === '3d' ? vars : ['x', 'y']);
+            equations.push(line);
+          } catch (e) {
+            problems.push(`${data.source}:"${line}" —— ${e.message}`);
+          }
+        }
+      } else {
+        explicit.push(line);
+      }
+    });
+
+    // 点的坐标只能是常量,构建期就求好;顺便检查它是否落在画图范围里
+    if (kind === '2d' && points.length && !constraints.length) {
+      // 只有点、没有曲线时,纵轴按点自动定范围(留 20% 边距)
+      const ys = points.map((p) => p.y);
+      if (!Array.isArray(o.y)) {
+        const lo = Math.min(...ys);
+        const hi = Math.max(...ys);
+        const pad = Math.max((hi - lo) * 0.2, 0.5);
+        o.y = [lo - pad, hi + pad];
+      }
+    }
+
+    const validate = (src, list) => list.forEach((s) => {
+      try {
+        if (s.includes('=') && !/<=|>=/.test(s)) Kit.compileImplicit(s, vars);
+        else Kit.compile(s, vars);
+      } catch (e) {
+        problems.push(`${data.source}:"${s}" —— ${e.message}`);
+      }
+    });
 
     let payload;
     let label;
     let ratio = null;
 
     if (kind === '3d') {
-      const isImplicit = all[0].includes('=');
-      if (all.length > 1) {
-        problems.push(`${data.source}:3D 只支持一个式子,后面的被忽略了`);
+      const isImplicit = equations.length > 0;
+      // 只有"曲面本身"(方程或显式函数)才算数量,约束条件和点不算
+      const surfaceCount = equations.length + explicit.length;
+      if (surfaceCount > 1) {
+        problems.push(`${data.source}:3D 只支持一个曲面/等值面,后面的被忽略了`);
       }
-      validate(all[0], ['x', 'y', 'z']);
+      const surface = isImplicit ? equations[0] : explicit[0];
+      if (surface) validate(surface, [surface]);
+
       if (isImplicit) {
         const opts = {
           x: normalizeRange(o.x, [-2, 2]),
@@ -223,49 +299,70 @@ hexo.extend.filter.register('after_post_render', function (data) {
           z: normalizeRange(o.z, [-2, 2]),
           grid: Math.max(8, Math.min(64, o.grid || 28)),
         };
-        payload = { expr: all[0], opts, implicit: true };
-        label = `3D 等值面 · ${all[0]}`;
+        payload = { expr: surface, opts, implicit: true };
+        label = `3D 等值面 · ${surface}`;
       } else {
-        validate(all[0], ['x', 'y']);
         const opts = {
           x: normalizeRange(o.x, [-5, 5]),
           y: normalizeRange(o.y, [-5, 5]),
           z: Array.isArray(o.z) ? normalizeRange(o.z, [-1, 1]) : null,
           grid: Math.max(8, Math.min(90, o.grid || 46)),
         };
-        payload = { expr: all[0], opts };
-        label = `3D 曲面 · z = ${all[0]}`;
+        payload = { expr: surface, opts };
+        label = `3D 曲面 · z = ${surface}`;
       }
+      payload.constraints = constraints;
+      payload.points = points;
+      if (constraints.length) label += ` · ${constraints.length} 个约束`;
+      if (points.length) label += ` · ${points.length} 个点`;
     } else {
       const keptExplicit = explicit.slice(0, 6);
       const keptImplicit = equations.slice(0, 6);
-      keptExplicit.forEach((s) => validate(s, ['x']));
-      keptImplicit.forEach((s) => validate(s, ['x', 'y']));
-      if (keptExplicit.length + keptImplicit.length === 0) {
+      validate('', []);
+      const allExprs = keptExplicit.concat(keptImplicit);
+      allExprs.forEach((s) => {
+        try {
+          if (s.includes('=')) Kit.compileImplicit(s, ['x', 'y']);
+          else Kit.compile(s, ['x']);
+        } catch (e) {
+          problems.push(`${data.source}:"${s}" —— ${e.message}`);
+        }
+      });
+
+      const regionOnly = !allExprs.length && constraints.length > 0;
+      if (!allExprs.length && !constraints.length && !points.length) {
         problems.push(`${data.source}:一个 plot2d 代码块里没有可画的式子`);
         return whole;
       }
 
-      let xr = normalizeRange(o.x, [-10, 10]);
+      const xr = normalizeRange(o.x, [-10, 10]);
       let yr = Array.isArray(o.y) ? normalizeRange(o.y, [-1, 1]) : null;
-      if (keptImplicit.length && !yr) {
-        // 隐式曲线(圆、椭圆…)必须让横纵比例一致,否则会画成扁的:
-        // 默认取和 x 一样宽的正方形窗口,并把画布设成正方形。
+      if ((keptImplicit.length || regionOnly) && !yr) {
+        // 隐式曲线和区域(圆、椭圆…)必须横纵等比例,否则会被压扁
         const cxr = (xr[0] + xr[1]) / 2;
         const half = (xr[1] - xr[0]) / 2;
         yr = [cxr - half, cxr + half];
       }
-      if (keptImplicit.length) ratio = 1;
+      if (keptImplicit.length || regionOnly) ratio = 1;
 
       const opts = {
         x: xr,
         y: yr,
         samples: Math.max(100, Math.min(2000, o.n || 900)),
       };
-      payload = { exprs: keptExplicit, implicit: keptImplicit, opts };
+      payload = {
+        exprs: keptExplicit,
+        implicit: keptImplicit,
+        constraints: constraints,
+        points: points,
+        opts,
+      };
       const parts = [];
+      if (regionOnly) parts.push('区域');
       if (keptExplicit.length) parts.push(`${keptExplicit.length} 条曲线`);
       if (keptImplicit.length) parts.push(`${keptImplicit.length} 个方程`);
+      if (constraints.length && !regionOnly) parts.push(`${constraints.length} 个约束`);
+      if (points.length) parts.push(`${points.length} 个点`);
       label = `2D · ${parts.join(' + ')}`;
     }
 
