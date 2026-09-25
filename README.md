@@ -331,19 +331,67 @@ npx hexo generate && node tools/deploy.mjs
 
 ## 部署
 
-源码在 `main` 分支,构建产物推到一个独立的 `gh-pages` 分支,GitHub Pages 的发布源指向它。这样 Jekyll 不会去处理 `source/` 里的 Markdown 源文件。
+**一条命令搞定:**
 
 ```bash
 npm run deploy
 ```
 
-`tools/deploy.mjs` 做三件事:在 `public/` 里放一个空的 `.nojekyll`(让 GitHub 跳过 Jekyll)、临时 `git init` 一个仓库、强推到 `gh-pages`。认证默认走 Git 凭据管理器;也可以提供令牌:
+它按顺序做四件事:
+
+```text
+1. 校验项目清单        → 防止私有仓库混进公开站点
+2. hexo generate       → 把 source/ 和主题渲染成 public/
+3. 源码提交并推送       → main 分支(文章、主题、配置的长期备份)
+4. 产物推送到 gh-pages → 用临时 git 仓库强推,GitHub Pages 对外提供的内容
+```
+
+第 4 步之前会在 `public/` 里放一个空的 `.nojekyll`,告诉 GitHub 不要再拿 Jekyll 处理一遍产物。
+
+**为什么是两个分支:** `main` 存源码,`gh-pages` 存构建结果。分开是为了不让 Jekyll 去处理 `source/` 里的 Markdown 源文件 —— 否则会生成一堆和产物重名的页面。
+
+### 常用参数
+
+```bash
+npm run deploy -- -m "写了篇音游判定分析"   # 自定义源码提交信息
+npm run deploy -- --no-source              # 只发站点,不动源码提交
+GITHUB_TOKEN=ghp_xxx npm run deploy        # 用令牌认证(CI / 无凭据管理器的环境)
+BLOG_REPO=https://github.com/u/r.git npm run deploy   # 临时换目标仓库
+```
+
+第 3 步是**全自动**的:它 `git add -A` 把工作区所有变更提交上去(提交信息默认是 `publish: <时间>`)。所以如果你手动改了配置或文章,直接 `npm run deploy` 就会一起带上。想自己控制提交信息就用 `-m`。
+
+### 只改文档、不想发布站点
+
+源码推送和站点发布是解耦的,直接走普通 git 操作即可:
+
+```bash
+git add -A && git commit -m "改了下 README" && git push
+```
+
+### 发布之后
+
+```bash
+npm run verify        # 等 20~60 秒,逐页验证线上与本地构建是否一致
+```
+
+GitHub Pages 的构建需要一点时间,`npm run verify` 会拿本地 `public/` 里的路由逐页去线上请求,所以增删文章之后不用改这个脚本。
+
+### 认证
+
+默认走 Git 凭据管理器(Windows 上是 Git Credential Manager)。如果环境里没有可用的凭据管理器,用令牌:
 
 ```bash
 GITHUB_TOKEN=ghp_xxx npm run deploy
 ```
 
-令牌只从环境变量读取,不会写进任何配置文件。
+令牌只从环境变量读取,**不会写进任何配置文件**。这也是不用 `hexo-deployer-git` 的原因 —— 那个插件要求把仓库地址(可能带令牌)写进 `_config.yml`。
+
+### 如果 Pages 没更新
+
+1. 先看 GitHub 仓库的 **Actions / Settings → Pages** 里最新一次构建状态;
+2. 构建报错的话,`npm run check` 能在本地提前发现大部分问题(死链、模板残留、关键结构缺失);
+3. 产物确实推上去了但线上没变 → 大概率是浏览器缓存,`Ctrl+Shift+R` 强刷。
 
 ## 自定义
 
