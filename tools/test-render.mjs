@@ -246,6 +246,32 @@ console.log('\n=== 3D 显式曲面 ===');
   ok('曲面四边形被填充', record.fills.length > 100, `${record.fills.length} 个`);
 }
 
+console.log('\n=== 3D 多曲面(正四面体堆积的四个相切球:用户笔记里的场景) ===');
+{
+  const { record, el } = render('3d', {
+    items: [
+      { type: 'implicit', expr: '(x-1)^2+y^2+z^2=3/4', constraints: [] },
+      { type: 'implicit', expr: '(x+1/2)^2+(y-sqrt(3)/2)^2+z^2=3/4', constraints: [] },
+      { type: 'implicit', expr: '(x+1/2)^2+(y+sqrt(3)/2)^2+z^2=3/4', constraints: [] },
+      { type: 'implicit', expr: 'x^2+y^2+(z-sqrt(2))^2=3/4', constraints: [] },
+      { type: 'point', x: 1, y: 0, z: 0, label: 'B', constraints: [] },
+      { type: 'point', x: 0, y: 0, z: Math.SQRT2, label: 'A', constraints: [] },
+      { type: 'point', x: -0.5, y: Math.sqrt(3) / 2, z: 0, label: 'C', constraints: [] },
+      { type: 'point', x: -0.5, y: -Math.sqrt(3) / 2, z: 0, label: 'D', constraints: [] },
+    ],
+    opts: { x: [-4, 4], y: [-4, 4], z: [-4, 4], grid: 28 },
+  });
+  ok('四个球面 + 四个点没有抛错', !el.dataset.error, errText(record));
+  ok('四个球都画出来了(面数远多于单个球)', record.fills.length > 500, `${record.fills.length} 个面`);
+  ok('四个点都画出来了', record.arcs.length >= 4, `${record.arcs.length} 个`);
+  ok('四个点的标签都在',
+    ['A', 'B', 'C', 'D'].every((L) => record.texts.some((t) => t[0] === L)),
+    record.texts.map((t) => t[0]).join(''));
+  // 多曲面时按曲面编号上色,应该出现多种颜色
+  const colors = new Set(record.shapes.filter((s) => s.kind === 'fill').map((s) => s.style));
+  ok('多个曲面用了不同颜色', colors.size >= 3, `${colors.size} 种颜色`);
+}
+
 console.log('\n=== 3D 隐式曲面 + 约束 + 点 ===');
 {
   const { record, el } = render('3d', {

@@ -202,6 +202,21 @@ const torus = Kit.surfaceNets(
 ok('环面这类复杂曲面也能提取', torus.verts.length > 500 && torus.quads.length > 500,
   `${torus.verts.length} 顶点 / ${torus.quads.length} 面`);
 
+// 非正方体包围盒:三个轴必须共用同一个 half。
+// 各轴各归一化的话,球会被拉成椭球 —— 形状就不是原来那个了。
+const boxed = Kit.surfaceNets(
+  Kit.compileImplicit('x^2 + y^2 + z^2 = 1', ['x', 'y', 'z']),
+  { x: [-8, 8], y: [-4, 4], z: [-4, 4], grid: 32 },
+);
+const span = (key, s) => Math.max(...s.verts.map((v) => Math.abs(v[key])));
+const sx = span('x', boxed), sy = span('y', boxed), sz = span('z', boxed);
+ok('非正方体包围盒里球还是球(三个方向的归一化半径相同)',
+  Math.abs(sx - sy) < 0.02 && Math.abs(sy - sz) < 0.02,
+  `x=${sx.toFixed(3)} y=${sy.toFixed(3)} z=${sz.toFixed(3)}`);
+ok('包围盒比例记在 ext 里(给坐标轴盒子用)',
+  Math.abs(boxed.ext[0] - 1) < 1e-9 && Math.abs(boxed.ext[1] - 0.5) < 1e-9 && Math.abs(boxed.ext[2] - 0.5) < 1e-9,
+  JSON.stringify(boxed.ext));
+
 console.log('\n=== 等式解析 ===');
 ok('parseEquation 认出显式', Kit.parseEquation('sin(x)').implicit === false);
 ok('parseEquation 认出隐式', Kit.parseEquation('x^2 + y^2 = 1').implicit === true);
@@ -309,6 +324,24 @@ ok('点是常量表达式,不能用 x', (() => {
 })());
 ok('点少于两个坐标会报错', (() => {
   try { Kit.parsePoints('point(1)', []); return false; } catch { return true; }
+})());
+
+// 坐标里带括号是完全正常的写法(sqrt(2)、sin(pi/6)…),
+// 早期版本用 [^,()]+ 抓坐标,这类点会被整条判成"写错了"然后悄悄丢掉。
+const p3d = Kit.parsePoints([
+  'point(0, 0, sqrt(2)) A',
+  'point(1, 0, 0) B',
+  'point(-1/2, sqrt(3)/2, 0) C',
+  'point(-1/2, -sqrt(3)/2, 0) D',
+].join('\n'), []);
+ok('坐标里带函数调用也能解析', p3d.length === 4, `${p3d.length} 个`);
+ok('sqrt(2) 求值正确', p3d[0] && Math.abs(p3d[0].z - Math.SQRT2) < 1e-12);
+ok('负分数 + sqrt 混合求值正确', p3d[2] && p3d[2].x === -0.5 && Math.abs(p3d[2].y - Math.sqrt(3) / 2) < 1e-12);
+ok('四个标签都在', p3d.map((p) => p.label).join('') === 'ABCD');
+ok('括号里的逗号不算坐标分隔符(min)',
+  Math.abs(Kit.parsePoints('point(min(1, 2), max(3, 4)) M', [])[0].y - 4) < 1e-12);
+ok('四个以上坐标会报错', (() => {
+  try { Kit.parsePoints('point(1, 2, 3, 4)', []); return false; } catch { return true; }
 })());
 
 console.log('\n=== where:按曲线定制约束 ===');

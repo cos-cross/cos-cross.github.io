@@ -300,35 +300,43 @@ hexo.extend.filter.register('after_post_render', function (data) {
     let ratio = null;
 
     if (kind === '3d') {
-      const isImplicit = curves.length > 0 && curves[0].type === 'implicit';
-      // 只有"曲面本身"才算数量,约束条件和点不算
-      if (curves.length > 1) {
-        problems.push(`${data.source}:3D 只支持一个曲面/等值面,后面的被忽略了`);
+      if (!curves.length && !points.length) {
+        problems.push(`${data.source}:一个 plot3d 代码块里没有可画的式子`);
+        return whole;
       }
-      const surface = curves[0];
-      const perCurve = surface ? surface.constraints.length - globalConds.length : 0;
-
-      if (surface && surface.type === 'implicit') {
-        const opts = {
+      // 一个图里可以叠多个曲面/等值面(比如正四面体堆积的四个相切球),
+      // 上限 8 个纯粹是防手滑:再多就该拆成几张图了。
+      const surfaces = curves.slice(0, 8);
+      if (curves.length > 8) {
+        problems.push(`${data.source}:3D 最多叠 8 个曲面,超出的被忽略了`);
+      }
+      // 隐式方程(f(x,y,z)=0)和显式曲面(z=...)的默认范围、网格数、归一化方式都不同,
+      // 混在同一个代码块里会互相打架,所以拆开判断并给个提醒。
+      const anyImplicit = surfaces.some((it) => it.type === 'implicit');
+      const anyExplicit = surfaces.some((it) => it.type !== 'implicit');
+      if (anyImplicit && anyExplicit) {
+        problems.push(`${data.source}:同一个 plot3d 里混了隐式方程和 z=... 曲面,建议拆成两个代码块`);
+      }
+      const o2 = anyImplicit
+        ? {
           x: normalizeRange(o.x, [-2, 2]),
           y: normalizeRange(o.y, [-2, 2]),
           z: normalizeRange(o.z, [-2, 2]),
-          grid: Math.max(8, Math.min(64, o.grid || 28)),
-        };
-        payload = { items: [surface].concat(points), opts };
-        label = `3D 等值面 · ${surface.expr}`;
-      } else {
-        const opts = {
+          grid: Math.max(8, Math.min(80, o.grid || 32)),
+        }
+        : {
           x: normalizeRange(o.x, [-5, 5]),
           y: normalizeRange(o.y, [-5, 5]),
           z: Array.isArray(o.z) ? normalizeRange(o.z, [-1, 1]) : null,
           grid: Math.max(8, Math.min(90, o.grid || 46)),
         };
-        payload = { items: (surface ? [surface] : []).concat(points), opts };
-        label = surface ? `3D 曲面 · z = ${surface.expr}` : '3D · 只有点';
-      }
-      if (globalConds.length) label += ` · ${globalConds.length} 个全局约束`;
-      if (perCurve) label += ` · 带 where`;
+      payload = { items: surfaces.concat(points), opts: o2 };
+      label = surfaces.length === 1
+        ? (anyImplicit ? `3D 等值面 · ${surfaces[0].expr}` : `3D 曲面 · z = ${surfaces[0].expr}`)
+        : `3D · ${surfaces.length} 个曲面`;
+      const globalCount = globalConds.length;
+      if (globalCount) label += ` · ${globalCount} 个全局约束`;
+      if (surfaces.some((it) => it.constraints.length > globalCount)) label += ' · 带 where';
       if (points.length) label += ` · ${points.length} 个点`;
     } else {
       const regionOnly = !curves.length && globalConds.length > 0;
