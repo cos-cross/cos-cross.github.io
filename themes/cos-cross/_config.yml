@@ -12,7 +12,9 @@ menu:
 
 # 站点主人信息
 profile:
-  name: Cos-Cross
+  # 站名默认取站点 _config.yml 的 title。下面这行注释着就是"跟随站点标题";
+  # 只有当导航和页脚想显示一个比站点标题更短的名字时,才把它打开。
+  # name: Cos-Cross
   handle: "@Cos_Cross"
   avatar: '/img/avatar.jpg'
   favicon: '/img/favicon-32.png'
@@ -22,8 +24,11 @@ profile:
 # 首页大屏(hero)
 hero:
   greeting: "PLAYER 1"
-  title: "Cos-Cross"
-  subtitle: "编程 · 数学 · 音游"
+  # 标题和副标题默认取站点 _config.yml 的 title / subtitle,改了站点配置这里会自动跟着变。
+  # 只有想让首页大屏显示一句不一样的话时,才打开下面两行。
+  # title:
+  # subtitle:
+  # desc 留空则用站点 _config.yml 的 description
   desc: "把灵感写成代码,把热爱打成 PERFECT。"
   tags:
     - JavaScript

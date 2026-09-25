@@ -1,14 +1,15 @@
 <%
   var currentPath = url_for(page.path || '/');
+  var siteName = theme.profile.name || config.title;
 %>
 <header class="site-nav" id="site-nav">
   <div class="nav-inner">
     <a class="brand" href="<%= url_for('/') %>">
       <span class="brand-avatar-wrap">
-        <img class="brand-avatar" src="<%= url_for(theme.profile.avatar) %>" alt="<%= theme.profile.name %>" width="38" height="38">
+        <img class="brand-avatar" src="<%= url_for(theme.profile.avatar) %>" alt="<%= siteName %>" width="38" height="38">
       </span>
       <span class="brand-text">
-        <strong><%= theme.profile.name %></strong>
+        <strong><%= siteName %></strong>
         <em><%= theme.profile.bio %></em>
       </span>
     </a>

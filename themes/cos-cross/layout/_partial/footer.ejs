@@ -1,8 +1,11 @@
+<%
+  var siteName = theme.profile.name || config.title;
+%>
 <footer class="site-footer">
   <div class="footer-glow" aria-hidden="true"></div>
   <div class="footer-inner">
     <div class="footer-brand">
-      <div class="footer-mark"><span class="grad-text"><%= theme.profile.name %></span></div>
+      <div class="footer-mark"><span class="grad-text"><%= siteName %></span></div>
       <p class="footer-slogan"><%= theme.footer.slogan %></p>
       <p class="footer-days">已经坚持了 <b id="site-days">—</b> 天</p>
     </div>
@@ -39,7 +42,7 @@
   </div>
 
   <div class="footer-bottom">
-    <span>© <%= theme.footer.since %>–<%= date(new Date(), 'YYYY') %> <%= theme.profile.name %></span>
+    <span>© <%= theme.footer.since %>–<%= date(new Date(), 'YYYY') %> <%= siteName %></span>
     <span class="footer-sep">·</span>
     <span>Powered by <a href="https://hexo.io" target="_blank" rel="noopener noreferrer">Hexo</a> &amp; GitHub Pages</span>
     <span class="footer-sep">·</span>

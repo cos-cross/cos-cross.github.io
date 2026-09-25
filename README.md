@@ -395,14 +395,35 @@ GITHUB_TOKEN=ghp_xxx npm run deploy
 
 ## 自定义
 
+**站名和副标题只有一处来源:`_config.yml` 的 `title` / `subtitle`。** 改完这几处会自动跟着变 —— 浏览器标签页、导航栏品牌名、首页大屏标题、页脚品牌名和版权行,全部一致。
+
 | 想改什么 | 改哪里 |
 | --- | --- |
-| 站点标题、描述、分页、RSS | `_config.yml` |
+| 站点标题、副标题、描述 | `_config.yml` 的 `title` / `subtitle` / `description`(唯一来源) |
+| 分页、RSS、归档 | `_config.yml` |
 | 导航项、头像、社交链接、动效开关 | `themes/cos-cross/_config.yml` |
-| 首页大屏文案、标签 | `themes/cos-cross/_config.yml` 的 `hero` |
+| 首页大屏的标语、按钮、技能标签 | `themes/cos-cross/_config.yml` 的 `hero` |
 | 项目清单 | `source/_data/projects.yml` |
 | 配色 / 圆角 / 间距 | `themes/cos-cross/source/css/style.css` 顶部的 CSS 变量 |
-| 头像、站点图标 | `themes/cos-cross/source/img/`(SVG) |
+| 头像、站点图标 | `npm run avatar -- <B站UID>` |
+
+主题配置里的这几项**默认是注释掉的**,因为它们会自动取站点配置的值:
+
+```yaml
+profile:
+  # name: Cos-Cross        # 注释着 → 用 _config.yml 的 title
+hero:
+  # title:                # 注释着 → 用 _config.yml 的 title
+  # subtitle:             # 注释着 → 用 _config.yml 的 subtitle
+  desc: "把灵感写成代码,把热爱打成 PERFECT。"   # 留空则用 _config.yml 的 description
+```
+
+只有当你**想让某个位置显示得和站点标题不一样**时才需要打开它们。比如站名是「Cos-CrossのBlogger」,但导航栏嫌太长想只显示「Cos-Cross」,就打开 `profile.name` 填短的:
+
+```yaml
+profile:
+  name: Cos-Cross          # 只有导航和页脚用它
+```
 
 所有配色都收在 `:root` 和 `[data-theme="light"]` 两组 CSS 变量里,换整套皮肤只需要改那几十行。
 

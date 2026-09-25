@@ -1,9 +1,17 @@
+<%
+  // 站名和副标题以站点 _config.yml 为准,主题配置里留空就用站点配置的值。
+  // 想给首页大屏单独写一句不一样的话,再在主题 _config.yml 里填 hero.title / hero.subtitle。
+  var heroTitle = theme.hero.title || config.title;
+  var heroSub = theme.hero.subtitle || config.subtitle || '';
+  var heroDesc = theme.hero.desc || config.description || '';
+  var siteName = theme.profile.name || config.title;
+%>
 <section class="hero">
   <div class="hero-inner">
     <div class="hero-avatar reveal">
       <span class="avatar-ring" aria-hidden="true"></span>
       <span class="avatar-ring avatar-ring-2" aria-hidden="true"></span>
-      <img src="<%= url_for(theme.profile.avatar) %>" alt="<%= theme.profile.name %>" width="128" height="128">
+      <img src="<%= url_for(theme.profile.avatar) %>" alt="<%= siteName %>" width="128" height="128">
       <span class="avatar-lv">LV.99</span>
     </div>
 
@@ -13,11 +21,11 @@
     </div>
 
     <h1 class="hero-title reveal">
-      <span class="grad-text glitch" data-text="<%= theme.hero.title %>"><%= theme.hero.title %></span>
+      <span class="grad-text glitch" data-text="<%= heroTitle %>"><%= heroTitle %></span>
     </h1>
 
-    <p class="hero-sub reveal"><%= theme.hero.subtitle %></p>
-    <p class="hero-desc reveal"><%= theme.hero.desc %></p>
+    <% if (heroSub) { %><p class="hero-sub reveal"><%= heroSub %></p><% } %>
+    <% if (heroDesc) { %><p class="hero-desc reveal"><%= heroDesc %></p><% } %>
 
     <div class="hero-actions reveal">
       <% (theme.hero.buttons || []).forEach(function (btn) { %>
