@@ -83,5 +83,9 @@
   </button>
 
   <script src="<%- url_for('/js/main.js') %>"></script>
+  <% if (page.content && String(page.content).indexOf('class="plot"') !== -1) { %>
+  <!-- 只有含函数图像的页面才加载绘图代码 -->
+  <script src="<%- url_for('/js/plot.js') %>"></script>
+  <% } %>
 </body>
 </html>
