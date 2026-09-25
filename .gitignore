@@ -3,15 +3,23 @@ node_modules/
 public/
 db.json
 .deploy_git/
-.deploy/
 *.log
 
-# ---- 部署脚本用的临时检出 ----
+# ---- 脚本运行时产生的临时目录 ----
+.deploy-tmp/
+.avatar-tmp/
+.wallpaper-tmp/
 .gh-pages-worktree/
+
+# ---- 随手放的草稿 / 密钥,别误提交 ----
+.env
+.env.*
+*.local
+.draft-*
 
 # ---- 编辑器 / 系统 ----
 .DS_Store
 Thumbs.db
 *.swp
 
-# 注意:_config.yml 里的敏感值(如令牌)永远不要写进仓库
+# 注意:令牌只从环境变量读,任何情况下都不要写进 _config.yml 或其它文件
