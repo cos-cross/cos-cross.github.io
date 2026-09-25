@@ -55,6 +55,7 @@
 │   ├── deploy.mjs            # 部署到 gh-pages
 │   ├── check.mjs             # 构建产物自检
 │   ├── verify-live.mjs       # 线上站点验证
+│   ├── verify-plots.mjs      # 线上函数图像专项验证(逐条复算)
 │   ├── sync-mdblog.mjs       # mdblog/ → source/_posts/ 同步
 │   ├── sync-files.mjs        # files/ → source/files/ 同步并生成下载页数据
 │   ├── import-wallpaper.mjs  # 从 Wallpaper Engine 导入壁纸当背景
@@ -88,6 +89,8 @@ npm install --ignore-scripts
 | `npm run check` | 构建并自检产物(死链、模板残留、关键结构) |
 | `npm run deploy` | 构建并发布到 `gh-pages` 分支 |
 | `npm run verify` | 部署后验证线上站点(页面 + 静态资源是否真的可达) |
+| `npm run verify:plots` | 专项验证线上函数图像:把页面上的每个式子用同一份核心重算一遍 |
+| `npm run test` | 跑绘图核心的 125 项单元测试 |
 | `npm run wallpaper -- 2903241954` | 从 Wallpaper Engine 导入壁纸当背景 |
 | `npm run wallpaper -- --list` | 列出本机所有 Wallpaper Engine 壁纸 |
 | `npm run mdblog` | 把 `mdblog/` 里的笔记同步成文章 |

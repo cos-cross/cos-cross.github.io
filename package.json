@@ -12,6 +12,7 @@
     "check": "node tools/test-plot.mjs && node tools/sync-mdblog.mjs && node tools/sync-files.mjs && hexo generate && node tools/check.mjs",
     "test": "node tools/test-plot.mjs",
     "verify": "node tools/verify-live.mjs",
+    "verify:plots": "node tools/verify-plots.mjs",
     "mdblog": "node tools/sync-mdblog.mjs",
     "files": "node tools/sync-files.mjs",
     "projects": "node tools/manage-projects.mjs",
