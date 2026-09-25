@@ -311,6 +311,43 @@ ok('点少于两个坐标会报错', (() => {
   try { Kit.parsePoints('point(1)', []); return false; } catch { return true; }
 })());
 
+console.log('\n=== where:按曲线定制约束 ===');
+ok('没有 where 时原样返回', Kit.splitWhere('sin(x)').conds.length === 0);
+ok('拆出单个条件', (() => {
+  const r = Kit.splitWhere('y = sin(x) where x > 0');
+  return r.base === 'y = sin(x)' && r.conds.length === 1 && r.conds[0] === 'x > 0';
+})());
+ok('and 连接多个条件', (() => {
+  const r = Kit.splitWhere('sin(x) where x > 0 and y < 1');
+  return r.conds.length === 2 && r.conds[1] === 'y < 1';
+})());
+ok('&& 也能连接', Kit.splitWhere('sin(x) where x > 0 && x < 3').conds.length === 2);
+ok('多个 where 连写', Kit.splitWhere('sin(x) where x > 0 where y > 0').conds.length === 2);
+ok('where 前后的空行会被去掉', Kit.splitWhere('   sin(x)   where   x > 0   ').base === 'sin(x)');
+ok('wherever 这类标识符不会被误切', Kit.splitWhere('wherever(x)').conds.length === 0);
+ok('base 里保留完整的等式', Kit.splitWhere('x^2 + y^2 = 1 where y > 0').base === 'x^2 + y^2 = 1');
+
+// 叠加语义:全局约束 + 各自的 where 一起生效
+const g = Kit.compileConstraint('x >= -2', ['x', 'y']);
+const own = Kit.compileConstraint('y > 0', ['x', 'y']);
+const combined = Kit.makeMask([g, own]);
+const sc = Kit.makeScope(['x', 'y']);
+function at(x, y) { sc.x = x; sc.y = y; return combined(sc); }
+ok('同时满足全局与自身时通过', at(0, 1) === true);
+ok('违反全局约束时被排除', at(-3, 1) === false);
+ok('违反自身 where 时被排除', at(0, -1) === false);
+
+// 两条曲线各自约束,互不影响
+const a = Kit.makeMask([Kit.compileConstraint('x >= 0', ['x', 'y'])]);
+const b = Kit.makeMask([Kit.compileConstraint('x < 0', ['x', 'y'])]);
+const dA = Kit.compute2D(['sin(x)'], { x: [-5, 5], samples: 200, mask: a }).series[0];
+const dB = Kit.compute2D(['cos(x)'], { x: [-5, 5], samples: 200, mask: b }).series[0];
+ok('第一条只保留 x>=0 的部分', dA.every((p) => p.y === null || p.x >= 0));
+ok('第二条只保留 x<0 的部分', dB.every((p) => p.y === null || p.x < 0));
+ok('两条都有一半左右被保留',
+  dA.filter((p) => p.y !== null).length > 90 && dA.filter((p) => p.y !== null).length < 110
+  && dB.filter((p) => p.y !== null).length > 90 && dB.filter((p) => p.y !== null).length < 110);
+
 console.log('\n=== 刻度与配色 ===');
 ok('niceStep 给出整齐的步长', [Kit.niceStep(10, 8), Kit.niceStep(1, 8), Kit.niceStep(1000, 5)]
   .every((v) => { const m = v / 10 ** Math.round(Math.log10(v)); return [1, 2, 5].some((k) => near(m, k) || near(m * 10, k)); }));

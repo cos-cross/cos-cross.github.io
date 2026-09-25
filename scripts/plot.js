@@ -196,10 +196,8 @@ hexo.extend.filter.register('after_post_render', function (data) {
 
     // 按行分类。判断顺序很重要:点的写法最特殊先认,
     // 然后是比较(<=/>= 里也含 "=",必须排在等号前面),最后才是等号和显式函数。
-    const points = [];
-    const constraints = [];
-    const equations = [];
-    const explicit = [];
+    const items = [];        // 曲线 / 方程 / 点,各自带自己的约束
+    const globalConds = [];  // 独立成行、不带 where 的约束 = 全图生效
 
     /**
      * `y = f(x)` / `z = f(x,y)` 这种"左边只有一个因变量"的等式,按显式函数处理。
@@ -221,45 +219,72 @@ hexo.extend.filter.register('after_post_render', function (data) {
     }
 
     all.forEach((line) => {
-      if (/^point\s*\(/i.test(line)) {
+      const { base, conds } = Kit.splitWhere(line);
+      if (!base) return;
+      conds.forEach((c) => {
         try {
-          points.push(...Kit.parsePoints(line, []));
+          Kit.compileConstraint(c, vars);
+        } catch (e) {
+          problems.push(`${data.source}:"${c}" —— ${e.message}`);
+        }
+      });
+
+      if (/^point\s*\(/i.test(base)) {
+        try {
+          Kit.parsePoints(base, []).forEach((p) => {
+            items.push({
+              type: 'point', x: p.x, y: p.y, z: p.z, label: p.label, constraints: conds,
+            });
+          });
         } catch (e) {
           problems.push(`${data.source}:"${line}" —— ${e.message}`);
         }
-      } else if (/<=|>=|<|>/.test(line)) {
+      } else if (!conds.length && /<=|>=|<|>/.test(base)) {
+        // 独立成行、不带 where 的约束:全图生效
         try {
-          Kit.compileConstraint(line, vars);
-          constraints.push(line);
+          Kit.compileConstraint(base, vars);
+          globalConds.push(base);
         } catch (e) {
           problems.push(`${data.source}:"${line}" —— ${e.message}`);
         }
-      } else if (line.includes('=')) {
+      } else if (/<=|>=|<|>/.test(base)) {
+        problems.push(`${data.source}:"${line}" —— 约束条件本身不能再跟 where`);
+      } else if (base.includes('=')) {
         const dep = kind === '3d' ? 'z' : 'y';
-        const asFn = asExplicit(line, dep);
+        const asFn = asExplicit(base, dep);
         if (asFn !== null) {
           try {
             Kit.compile(asFn, kind === '3d' ? ['x', 'y'] : ['x']);
-            explicit.push(asFn);
+            items.push({ type: 'explicit', expr: asFn, constraints: conds });
           } catch (e) {
             problems.push(`${data.source}:"${line}" —— ${e.message}`);
           }
         } else {
           try {
-            Kit.compileImplicit(line, kind === '3d' ? vars : ['x', 'y']);
-            equations.push(line);
+            Kit.compileImplicit(base, kind === '3d' ? vars : ['x', 'y']);
+            items.push({ type: 'implicit', expr: base, constraints: conds });
           } catch (e) {
             problems.push(`${data.source}:"${line}" —— ${e.message}`);
           }
         }
       } else {
-        explicit.push(line);
+        try {
+          Kit.compile(base, kind === '3d' ? ['x', 'y'] : ['x']);
+          items.push({ type: 'explicit', expr: base, constraints: conds });
+        } catch (e) {
+          problems.push(`${data.source}:"${line}" —— ${e.message}`);
+        }
       }
     });
 
-    // 点的坐标只能是常量,构建期就求好;顺便检查它是否落在画图范围里
-    if (kind === '2d' && points.length && !constraints.length) {
-      // 只有点、没有曲线时,纵轴按点自动定范围(留 20% 边距)
+    // 全局约束并进每一条:语义是"先按整张图的限制裁,再按各自 where 裁"
+    items.forEach((it) => { it.constraints = globalConds.concat(it.constraints); });
+
+    const curves = items.filter((it) => it.type !== 'point');
+    const points = items.filter((it) => it.type === 'point');
+
+    // 只有点、没有任何曲线时,纵轴按点自动定范围(留 20% 边距)
+    if (kind === '2d' && points.length && !curves.length) {
       const ys = points.map((p) => p.y);
       if (!Array.isArray(o.y)) {
         const lo = Math.min(...ys);
@@ -269,38 +294,28 @@ hexo.extend.filter.register('after_post_render', function (data) {
       }
     }
 
-    const validate = (src, list) => list.forEach((s) => {
-      try {
-        if (s.includes('=') && !/<=|>=/.test(s)) Kit.compileImplicit(s, vars);
-        else Kit.compile(s, vars);
-      } catch (e) {
-        problems.push(`${data.source}:"${s}" —— ${e.message}`);
-      }
-    });
-
     let payload;
     let label;
     let ratio = null;
 
     if (kind === '3d') {
-      const isImplicit = equations.length > 0;
-      // 只有"曲面本身"(方程或显式函数)才算数量,约束条件和点不算
-      const surfaceCount = equations.length + explicit.length;
-      if (surfaceCount > 1) {
+      const isImplicit = curves.length > 0 && curves[0].type === 'implicit';
+      // 只有"曲面本身"才算数量,约束条件和点不算
+      if (curves.length > 1) {
         problems.push(`${data.source}:3D 只支持一个曲面/等值面,后面的被忽略了`);
       }
-      const surface = isImplicit ? equations[0] : explicit[0];
-      if (surface) validate(surface, [surface]);
+      const surface = curves[0];
+      const perCurve = surface ? surface.constraints.length - globalConds.length : 0;
 
-      if (isImplicit) {
+      if (surface && surface.type === 'implicit') {
         const opts = {
           x: normalizeRange(o.x, [-2, 2]),
           y: normalizeRange(o.y, [-2, 2]),
           z: normalizeRange(o.z, [-2, 2]),
           grid: Math.max(8, Math.min(64, o.grid || 28)),
         };
-        payload = { expr: surface, opts, implicit: true };
-        label = `3D 等值面 · ${surface}`;
+        payload = { items: [surface].concat(points), opts };
+        label = `3D 等值面 · ${surface.expr}`;
       } else {
         const opts = {
           x: normalizeRange(o.x, [-5, 5]),
@@ -308,60 +323,48 @@ hexo.extend.filter.register('after_post_render', function (data) {
           z: Array.isArray(o.z) ? normalizeRange(o.z, [-1, 1]) : null,
           grid: Math.max(8, Math.min(90, o.grid || 46)),
         };
-        payload = { expr: surface, opts };
-        label = `3D 曲面 · z = ${surface}`;
+        payload = { items: (surface ? [surface] : []).concat(points), opts };
+        label = surface ? `3D 曲面 · z = ${surface.expr}` : '3D · 只有点';
       }
-      payload.constraints = constraints;
-      payload.points = points;
-      if (constraints.length) label += ` · ${constraints.length} 个约束`;
+      if (globalConds.length) label += ` · ${globalConds.length} 个全局约束`;
+      if (perCurve) label += ` · 带 where`;
       if (points.length) label += ` · ${points.length} 个点`;
     } else {
-      const keptExplicit = explicit.slice(0, 6);
-      const keptImplicit = equations.slice(0, 6);
-      validate('', []);
-      const allExprs = keptExplicit.concat(keptImplicit);
-      allExprs.forEach((s) => {
-        try {
-          if (s.includes('=')) Kit.compileImplicit(s, ['x', 'y']);
-          else Kit.compile(s, ['x']);
-        } catch (e) {
-          problems.push(`${data.source}:"${s}" —— ${e.message}`);
-        }
-      });
-
-      const regionOnly = !allExprs.length && constraints.length > 0;
-      if (!allExprs.length && !constraints.length && !points.length) {
+      const regionOnly = !curves.length && globalConds.length > 0;
+      if (!curves.length && !globalConds.length && !points.length) {
         problems.push(`${data.source}:一个 plot2d 代码块里没有可画的式子`);
         return whole;
       }
+      if (curves.length > 6) {
+        problems.push(`${data.source}:2D 最多 6 条曲线/方程,超出的被忽略了`);
+      }
+      const kept = curves.slice(0, 6);
+      const hasImplicit = kept.some((it) => it.type === 'implicit');
 
       const xr = normalizeRange(o.x, [-10, 10]);
       let yr = Array.isArray(o.y) ? normalizeRange(o.y, [-1, 1]) : null;
-      if ((keptImplicit.length || regionOnly) && !yr) {
+      if ((hasImplicit || regionOnly) && !yr) {
         // 隐式曲线和区域(圆、椭圆…)必须横纵等比例,否则会被压扁
         const cxr = (xr[0] + xr[1]) / 2;
         const half = (xr[1] - xr[0]) / 2;
         yr = [cxr - half, cxr + half];
       }
-      if (keptImplicit.length || regionOnly) ratio = 1;
+      if (hasImplicit || regionOnly) ratio = 1;
 
-      const opts = {
-        x: xr,
-        y: yr,
-        samples: Math.max(100, Math.min(2000, o.n || 900)),
-      };
       payload = {
-        exprs: keptExplicit,
-        implicit: keptImplicit,
-        constraints: constraints,
-        points: points,
-        opts,
+        items: kept.concat(points),
+        region: regionOnly ? globalConds : [],
+        opts: { x: xr, y: yr, samples: Math.max(100, Math.min(2000, o.n || 900)) },
       };
       const parts = [];
       if (regionOnly) parts.push('区域');
-      if (keptExplicit.length) parts.push(`${keptExplicit.length} 条曲线`);
-      if (keptImplicit.length) parts.push(`${keptImplicit.length} 个方程`);
-      if (constraints.length && !regionOnly) parts.push(`${constraints.length} 个约束`);
+      const nExplicit = kept.filter((it) => it.type === 'explicit').length;
+      const nImplicit = kept.filter((it) => it.type === 'implicit').length;
+      if (nExplicit) parts.push(`${nExplicit} 条曲线`);
+      if (nImplicit) parts.push(`${nImplicit} 个方程`);
+      if (globalConds.length && !regionOnly) parts.push(`${globalConds.length} 个全局约束`);
+      const withWhere = kept.filter((it) => it.constraints.length > globalConds.length).length;
+      if (withWhere) parts.push(`${withWhere} 条带 where`);
       if (points.length) parts.push(`${points.length} 个点`);
       label = `2D · ${parts.join(' + ')}`;
     }

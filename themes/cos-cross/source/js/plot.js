@@ -288,6 +288,24 @@
   }
 
   /**
+   * 把一行里的 "where" 子句拆出来:
+   *   y = sin(x) where x > 0 and y < 1
+   * → { base: "y = sin(x)", conds: ["x > 0", "y < 1"] }
+   * `and` 和 `&&` 都认;没有 where 时 conds 为空数组。
+   *
+   * 用 \b 做词边界,免得把 `wherever` 之类的标识符也当成关键字。
+   */
+  function splitWhere(line) {
+    const parts = String(line).split(/\s+\bwhere\b\s+/i);
+    if (parts.length === 1) return { base: String(line).trim(), conds: [] };
+    const conds = parts.slice(1)
+      .flatMap((s) => s.split(/\s+(?:and|&&)\s+/i))
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return { base: parts[0].trim(), conds };
+  }
+
+  /**
    * 单独的点,坐标在**构建期**就求好(写成字符串带过来,浏览器端不重复解析)。
    * 支持 point(1, 2) / point(1, 2, 3),后面可以跟一个标签:point(1,2) A
    */
@@ -980,44 +998,36 @@
       });
     }
 
-    state.series.forEach(function (pts, si) {
+    // 每条曲线按自己的约束算好了,依次画(颜色按顺序分配)
+    (state.renderedSeries || []).forEach(function (item, si) {
       var color = state.colors[si % state.colors.length];
       ctx.lineWidth = 2.2;
       ctx.strokeStyle = color;
       ctx.shadowColor = color;
       ctx.shadowBlur = 8;
       ctx.lineJoin = 'round';
-      ctx.beginPath();
-      var started = false;
-      for (var i = 0; i < pts.length; i++) {
-        var p = pts[i];
-        if (p.y === null) { started = false; continue; }
-        var px = x2p(p.x), py = y2p(p.y);
-        // 纵向出界时截断,避免曲线飞出画布还拖着长线
-        if (py < -h * 4 || py > h * 5) { started = false; continue; }
-        if (!started) { ctx.moveTo(px, py); started = true; }
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-    });
-
-    // 隐式方程 f(x,y)=0:等值线段。线段很密(每格一小段),
-    // 一次性塞进同一条路径描边,避免几千次 beginPath/stroke。
-    (state.implicitSegs || []).forEach(function (segs, ii) {
-      if (!segs || !segs.length) return;
-      var color = state.colors[(state.series.length + ii) % state.colors.length];
-      ctx.lineWidth = 2.2;
       ctx.lineCap = 'round';
-      ctx.strokeStyle = color;
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 8;
       ctx.beginPath();
-      for (var s = 0; s < segs.length; s++) {
-        var a = segs[s][0];
-        var b = segs[s][1];
-        ctx.moveTo(x2p(a.x), y2p(a.y));
-        ctx.lineTo(x2p(b.x), y2p(b.y));
+
+      if (item.kind === 'explicit') {
+        var started = false;
+        for (var i = 0; i < item.series.length; i++) {
+          var p = item.series[i];
+          if (p.y === null) { started = false; continue; }
+          var px = x2p(p.x), py = y2p(p.y);
+          // 纵向出界时截断,避免曲线飞出画布还拖着长线
+          if (py < -h * 4 || py > h * 5) { started = false; continue; }
+          if (!started) { ctx.moveTo(px, py); started = true; }
+          else ctx.lineTo(px, py);
+        }
+      } else {
+        // 隐式等值线:线段很密(每格一小段),一次性塞进同一条路径描边
+        for (var s = 0; s < item.segs.length; s++) {
+          var a = item.segs[s][0];
+          var b = item.segs[s][1];
+          ctx.moveTo(x2p(a.x), y2p(a.y));
+          ctx.lineTo(x2p(b.x), y2p(b.y));
+        }
       }
       ctx.stroke();
       ctx.shadowBlur = 0;
@@ -1235,30 +1245,37 @@
     }
 
     try {
-      // 约束条件:统一编译成"是否在允许区域内"的判定
+      // 每条曲线 / 每个点都带自己的约束(构建期已经把全局约束并进去了),
+      // 所以这里给每一条单独编译一个 mask。
       const varNames = kind === '3d' ? ['x', 'y', 'z'] : ['x', 'y'];
-      const tests = (payload.constraints || []).map(function (c) {
-        return compileConstraint(c, varNames);
+      const compiled = (payload.items || []).map(function (it) {
+        const tests = (it.constraints || []).map(function (c) {
+          return compileConstraint(c, varNames);
+        });
+        return Object.assign({}, it, { mask: makeMask(tests) });
       });
-      const mask = makeMask(tests);
 
       if (kind === '3d') {
-        const o = Object.assign({}, payload.opts, { mask: mask });
-        if (payload.implicit) {
-          state.mesh = surfaceNets(compileImplicit(payload.expr, varNames), o);
-        } else {
-          state.surface = buildSurface(payload.expr, o);
+        const surface = compiled.find(function (it) { return it.type !== 'point'; });
+        const o = Object.assign({}, payload.opts, { mask: surface ? surface.mask : null });
+        if (surface && surface.type === 'implicit') {
+          state.mesh = surfaceNets(compileImplicit(surface.expr, varNames), o);
+        } else if (surface) {
+          state.surface = buildSurface(surface.expr, o);
         }
         state.cam = { az: -0.62, el: 0.52, dist: 3.4, focal: 3.4, zoom: 1 };
 
         // 点从数学坐标换算到和曲面同一套归一化立方体里
-        const { x: [ax, bx], y: [ay, by], z: [az2, bz2] } = payload.opts;
+        const [ax, bx] = payload.opts.x;
+        const [ay, by] = payload.opts.y;
+        const [az2, bz2] = payload.opts.z;
         const cx = (ax + bx) / 2, cy = (ay + by) / 2, cz = (az2 + bz2) / 2;
         const scope = makeScope(['x', 'y', 'z']);
-        state.points = (payload.points || []).filter(function (p) {
-          if (!mask) return true;
-          scope.x = p.x; scope.y = p.y; scope.z = p.z;
-          return mask(scope);
+        state.points = compiled.filter(function (it) {
+          if (it.type !== 'point') return false;
+          if (!it.mask) return true;
+          scope.x = it.x; scope.y = it.y; scope.z = it.z;
+          return it.mask(scope);
         }).map(function (p) {
           return {
             nx: (p.x - cx) / ((bx - ax) / 2 || 1),
@@ -1268,26 +1285,33 @@
           };
         });
       } else {
-        state.exprs = payload.exprs || [];
-        state.implicitFns = (payload.implicit || []).map(function (e) {
-          return compileImplicit(e, ['x', 'y']);
-        });
-        state.constraints = tests;
-        state.mask = mask;
-        // 只给约束条件 = 画区域
-        state.regionOnly = !state.exprs.length && !state.implicitFns.length && Boolean(mask);
-        state.implicitSegs = [];
+        // 区域模式:整块只有约束条件
+        state.regionMask = (payload.region && payload.region.length)
+          ? makeMask(payload.region.map(function (c) { return compileConstraint(c, varNames); }))
+          : null;
+        state.regionOnly = Boolean(state.regionMask);
         state.regionCells = [];
         state.regionBoundary = [];
+
+        const scope = makeScope(['x', 'y']);
+        const curves = [];
+        const dots = [];
+        compiled.forEach(function (it) {
+          if (it.type === 'point') {
+            if (!it.mask) { dots.push(it); return; }
+            scope.x = it.x; scope.y = it.y;
+            if (it.mask(scope)) dots.push(it);
+          } else if (it.type === 'implicit') {
+            curves.push({ kind: 'implicit', fn: compileImplicit(it.expr, varNames), mask: it.mask });
+          } else {
+            curves.push({ kind: 'explicit', expr: it.expr, mask: it.mask });
+          }
+        });
+        state.curves = curves;
+        state.points = dots;
         state.colors = COLORS;
         state.opts = payload.opts;
-        // 点也要过一遍约束
-        const scope = makeScope(['x', 'y']);
-        state.points = (payload.points || []).filter(function (p) {
-          if (!mask) return true;
-          scope.x = p.x; scope.y = p.y;
-          return mask(scope);
-        });
+        state.renderedSeries = [];
         state.view = { x0: payload.opts.x[0], x1: payload.opts.x[1], y0: -1, y1: 1 };
       }
     } catch (e) {
@@ -1300,21 +1324,29 @@
     function resample() {
       if (kind === '3d') return;
       var range = { x: [state.view.x0, state.view.x1], y: [state.view.y0, state.view.y1] };
-      if (state.exprs.length) {
-        state.series = compute2D(state.exprs, {
-          x: range.x, samples: 900, mask: state.mask,
-        }).series;
-      } else {
-        state.series = [];
-      }
-      // 等值线跟着视野重新采样,放大时才不会变成折线
-      state.implicitSegs = state.implicitFns.map(function (fn) {
-        return marchingSquares(fn, { x: range.x, y: range.y, nx: 170, ny: 170, mask: state.mask });
+
+      // 每条曲线自己算自己那份 —— 约束不同,不能像以前那样一次算完
+      state.renderedSeries = state.curves.map(function (c) {
+        if (c.kind === 'explicit') {
+          return {
+            kind: 'explicit',
+            series: compute2D([c.expr], { x: range.x, samples: 900, mask: c.mask }).series[0],
+          };
+        }
+        return {
+          kind: 'implicit',
+          segs: marchingSquares(c.fn, {
+            x: range.x, y: range.y, nx: 170, ny: 170, mask: c.mask,
+          }),
+        };
       });
-      if (state.regionOnly && state.mask) {
-        state.regionCells = regionCells(state.mask, { x: range.x, y: range.y, nx: 150, ny: 150 });
-        state.regionBoundary = state.constraints.map(function (fn) {
-          return marchingSquares(fn, { x: range.x, y: range.y, nx: 170, ny: 170 });
+
+      if (state.regionOnly) {
+        state.regionCells = regionCells(state.regionMask, {
+          x: range.x, y: range.y, nx: 150, ny: 150,
+        });
+        state.regionBoundary = (payload.region || []).map(function (c) {
+          return marchingSquares(compileConstraint(c, varNames), { x: range.x, y: range.y, nx: 170, ny: 170 });
         });
       }
     }
@@ -1322,8 +1354,9 @@
     function autoFitY() {
       if (kind === '3d' || state.opts.y) return;
       var lo = Infinity, hi = -Infinity;
-      state.series.forEach(function (pts) {
-        pts.forEach(function (p) {
+      (state.renderedSeries || []).forEach(function (item) {
+        if (item.kind !== 'explicit') return;
+        item.series.forEach(function (p) {
           if (p.y === null) return;
           if (p.y < lo) lo = p.y;
           if (p.y > hi) hi = p.y;
@@ -1534,6 +1567,7 @@
     parseConstraint: parseConstraint,
     compileConstraint: compileConstraint,
     makeMask: makeMask,
+    splitWhere: splitWhere,
     parsePoints: parsePoints,
     regionCells: regionCells,
     projectMeshQuads: projectMeshQuads,
