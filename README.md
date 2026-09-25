@@ -73,6 +73,9 @@ npm install --ignore-scripts
 | `npm run verify` | 部署后验证线上站点(页面 + 静态资源是否真的可达) |
 | `npm run wallpaper -- 2903241954` | 从 Wallpaper Engine 导入壁纸当背景 |
 | `npm run wallpaper -- --list` | 列出本机所有 Wallpaper Engine 壁纸 |
+| `npm run projects -- check` | 校验项目清单(揪出私有仓库) |
+| `npm run projects -- list` | 列出所有公开仓库及收录状态 |
+| `npm run projects -- add <仓库名>` | 从 GitHub 生成一条项目清单骨架 |
 | `npm run new "标题"` | 新建一篇文章 |
 | `npm run vendor:katex` | 从 `node_modules/katex` 重新复制运行时资源 |
 
@@ -203,6 +206,87 @@ npm run verify      # 等 Pages 构建完(约半分钟),验证线上
 ```
 
 前两步在本地几秒就能跑完,推上去之后 GitHub Pages 构建大约需要 20~60 秒。
+
+## 增删要展示的项目
+
+网站上的项目展示**只有一个数据源**:`source/_data/projects.yml`。想改就去改它,不需要动任何模板代码。
+
+### 删除
+
+把那一整段 `- name: xxx` 删掉就行。比如不想展示 `FinalShellActivator`:
+
+```yaml
+# 整段删掉 ↓
+- name: FinalShellActivator
+  desc: 一个用于激活 FinalShell 的小工具。
+  lang: Kotlin
+  link: ''
+  repo: https://github.com/cos-cross/FinalShellActivator
+  tags: [Kotlin, 工具]
+  icon: code
+  accent: violet
+  group: 小玩意
+```
+
+### 暂时隐藏(不想删掉配置)
+
+在那一项里加一行 `hidden: true`:
+
+```yaml
+- name: FinalShellActivator
+  hidden: true          # ← 加这一行,首页和 /projects/ 都不再展示
+  desc: ...
+```
+
+### 添加
+
+两种方式,任选:
+
+```bash
+# ① 自动拉取仓库信息,生成骨架(推荐)
+npm run projects -- add GuessLetter
+```
+
+```yaml
+# ② 手动复制一段改字段
+- name: 新项目
+  desc: 一句话介绍
+  lang: JavaScript
+  link: ''                                   # 有在线地址才填
+  repo: https://github.com/cos-cross/新项目
+  tags: [标签1, 标签2]
+  icon: code                                 # code / star / music / link
+  accent: cyan                               # cyan / violet / pink / lime / gold
+  group: 在线工具                             # /projects/ 页面按它分组
+```
+
+**数组顺序就是展示顺序。** 首页只显示前几个,数量在 `themes/cos-cross/_config.yml` 的 `home.projects` 里改。
+
+### ⚠️ 别把私有仓库写进去
+
+`projects.yml` 会提交到公开仓库,渲染出来人人可见。**私有仓库的仓库名和描述写进去就等于泄露。**
+
+为此加了一道校验:
+
+```bash
+npm run projects -- check
+```
+
+它请求的是 GitHub 的**公开**接口 `/users/<你>/repos` —— 未认证请求天然看不到任何私有仓库,所以「清单里有、公开列表里没有」就等价于「私有 / 已删除 / 已改名」,三种情况都会被报出来:
+
+```text
+❌ 有 1 个必须修的问题:
+   - 「某个项目」不在 cos-cross 的公开仓库里 —— 它可能是私有仓库、已删除或已改名。
+     私有仓库出现在公开站点上等于泄露,请删掉这一项或加 hidden: true。
+```
+
+`npm run projects -- add` 同样会拦截:往私有仓库加会得到 404,直接拒绝并在输出里说明原因。
+
+**这道校验已经内置进 `npm run deploy`**,所以私有仓库泄露不出去。如果只是想跳过网络校验(比如 GitHub API 暂时不通),可以直接跑:
+
+```bash
+npx hexo generate && node tools/deploy.mjs
+```
 
 ## 部署
 

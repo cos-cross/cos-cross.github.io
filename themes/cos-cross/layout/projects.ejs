@@ -1,5 +1,7 @@
 <%
-  var projects = (site.data && site.data.projects) ? site.data.projects : [];
+  // hidden: true 的项目不展示
+  var projects = ((site.data && site.data.projects) ? site.data.projects : [])
+    .filter(function (item) { return !item.hidden; });
   var groupOrder = [];
   var groups = {};
   projects.forEach(function (item) {

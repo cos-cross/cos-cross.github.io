@@ -1,17 +1,30 @@
 # ============================================================
-#  项目 / 作品清单
-#  首页只显示前 N 个(在主题 _config.yml 的 home.projects 里改),
-#  /projects/ 页面会按 group 分组显示全部。
+#  项目 / 作品清单 —— 这就是网站上项目展示的唯一数据源
+#
+#  【删除】直接删掉整段 `- name: xxx` 到下一个 `- name:` 之间的内容
+#  【暂时隐藏】在那一项里加一行 `hidden: true`,不用删
+#  【调整顺序】数组顺序就是显示顺序,首页只取前几个
+#  【添加】复制一段改字段,或者用命令自动生成骨架:
+#           npm run projects -- add <仓库名>
+#
+#  改完记得 `npm run check` 自检、`npm run deploy` 发布。
+#
+#  ⚠️ 私有仓库不要写进来! 这个文件会公开在 GitHub 上,
+#     而且渲染出来人人可见。发布前可以跑:
+#           npm run projects -- check
+#     它会用「公开」接口核对,私有 / 已删除 / 改名的仓库会被当场揪出来。
+#
 #  字段说明:
-#    name    项目名
+#    name    项目名(必填)
 #    desc    一句话介绍
-#    lang    主要语言(显示在右上角)
+#    lang    主要语言(显示在卡片右上角)
 #    link    在线体验地址(有 Pages 的项目才有)
 #    repo    GitHub 仓库地址
 #    tags    标签数组
 #    icon    图标: code / star / music / link
 #    accent  配色: cyan / violet / pink / lime / gold
-#    group   分组名
+#    group   分组名(/projects/ 页面按它分组)
+#    hidden  true 则不展示(默认 false)
 # ============================================================
 
 - name: IdealizedPreviewer
@@ -72,16 +85,6 @@
   tags: [Kotlin, 工具]
   icon: code
   accent: violet
-  group: 小玩意
-
-- name: iKunPong
-  desc: iKun Pong 小游戏,写着玩的。
-  lang: HTML
-  link: ''
-  repo: https://github.com/cos-cross/iKunPong
-  tags: [小游戏, 娱乐]
-  icon: star
-  accent: pink
   group: 小玩意
 
 - name: cos-cross.github.io

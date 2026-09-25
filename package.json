@@ -8,9 +8,10 @@
     "build": "hexo generate",
     "server": "hexo server",
     "new": "hexo new",
-    "deploy": "hexo generate && node tools/deploy.mjs",
+    "deploy": "node tools/manage-projects.mjs check --soft && hexo generate && node tools/deploy.mjs",
     "check": "hexo generate && node tools/check.mjs",
     "verify": "node tools/verify-live.mjs",
+    "projects": "node tools/manage-projects.mjs",
     "wallpaper": "node tools/import-wallpaper.mjs",
     "vendor:katex": "node tools/vendor-katex.mjs"
   },

@@ -1,7 +1,9 @@
 <%
-  var projects = (site.data && site.data.projects) ? site.data.projects : [];
+  // hidden: true 的项目在所有位置都不展示(数据仍留在 projects.yml 里)
+  var all = ((site.data && site.data.projects) ? site.data.projects : [])
+    .filter(function (item) { return !item.hidden; });
   var limit = (theme.home && theme.home.projects) ? theme.home.projects : 3;
-  var shown = projects.slice(0, limit);
+  var shown = all.slice(0, limit);
 %>
 <% if (shown.length) { %>
 <section class="section">

@@ -12,6 +12,10 @@ author: Cos-Cross
 language: zh-CN
 timezone: Asia/Shanghai
 
+# 项目清单校验用(npm run projects)。工具只请求 GitHub 的公开接口,
+# 未认证请求看不到任何私有仓库,所以私有仓库一旦写进清单就会被当场发现。
+github_user: cos-cross
+
 # ---------- 网址 ----------
 url: https://cos-cross.github.io
 root: /
