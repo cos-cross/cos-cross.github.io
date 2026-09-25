@@ -148,7 +148,7 @@
       
       <span class="meta-item">
 <svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm1 3v5.6l3.7 2.1-1 1.7L11 13.7V7z" fill="currentColor"/></svg>
-约 3 分钟</span>
+约 4 分钟</span>
       
       
       
@@ -181,7 +181,7 @@
 <p>但第三个问题却是第二个问题在极值时构造, 看上去难度肯定比前两个要简单不少</p>
 <div class="plot" data-kind="3d" data-mount>
   <div class="plot-bar">
-    <span class="plot-kind">3D 等值面 · (x-1)^2+y^2+z^2=3/4 · 1 个点</span>
+    <span class="plot-kind">3D · 4 个曲面 · 4 个点</span>
     <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
     <span class="plot-actions">
       <button type="button" data-plot-action="reset">重置</button>
@@ -189,7 +189,7 @@
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"implicit","expr":"(x-1)^2+y^2+z^2=3/4","constraints":[]},{"type":"point","x":1,"y":0,"z":0,"label":"B","constraints":[]}],"opts":{"x":[-4,4],"y":[-4,4],"z":[-4,4],"grid":28}}</script>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"(x-1)^2+y^2+z^2=3/4","constraints":[]},{"type":"implicit","expr":"(x+1/2)^2+(y-sqrt(3)/2)^2+z^2=3/4","constraints":[]},{"type":"implicit","expr":"(x+1/2)^2+(y+sqrt(3)/2)^2+z^2=3/4","constraints":[]},{"type":"implicit","expr":"x^2+y^2+(z-sqrt(2))^2=3/4","constraints":[]},{"type":"point","x":0,"y":0,"z":1.4142135623730951,"label":"A","constraints":[]},{"type":"point","x":1,"y":0,"z":0,"label":"B","constraints":[]},{"type":"point","x":-0.5,"y":0.8660254037844386,"z":0,"label":"C","constraints":[]},{"type":"point","x":-0.5,"y":-0.8660254037844386,"z":0,"label":"D","constraints":[]}],"opts":{"x":[-4,4],"y":[-4,4],"z":[-4,4],"grid":32}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>point(0, 0, sqrt(2)) A
 point(1, 0, 0) B
 point(-1/2, sqrt(3)/2, 0) C
@@ -358,7 +358,7 @@ RSS / Atom</a></li>
   <!-- 只有含函数图像的页面才加载绘图代码。
        ?v= 是缓存版本号:payload 结构变过(加了约束和点),不带版本号的话
        浏览器可能拿旧缓存去配新页面,图会画错甚至报错。 -->
-  <script src="/js/plot.js?v=3"></script>
+  <script src="/js/plot.js?v=4"></script>
   
 </body>
 </html>

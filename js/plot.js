@@ -309,23 +309,65 @@
    * 单独的点,坐标在**构建期**就求好(写成字符串带过来,浏览器端不重复解析)。
    * 支持 point(1, 2) / point(1, 2, 3),后面可以跟一个标签:point(1,2) A
    */
-  const POINT_RE = /point\s*\(\s*([^,()]+)\s*,\s*([^,()]+)\s*(?:,\s*([^,()]+)\s*)?\)\s*([^\s(<]*)?/g;
+  /**
+   * 从 `point(` 之后找出配对的那个右括号。
+   * 不能拿正则 `[^,()]+` 硬凑 —— 坐标里完全可以出现括号(比如 sqrt(3)/2),
+   * 那样整个 point 都会被判成"写错了"。所以老老实实数括号层数。
+   */
+  function matchParen(s, open) {
+    let depth = 0;
+    for (let i = open; i < s.length; i++) {
+      if (s[i] === '(') depth++;
+      else if (s[i] === ')') {
+        depth--;
+        if (depth === 0) return i;
+      }
+    }
+    return -1;
+  }
+
+  /** 按顶层逗号切分(括号里的逗号不算分隔符,支持 point(min(1,2), 3)) */
+  function splitTopLevel(s) {
+    const out = [];
+    let depth = 0;
+    let cur = '';
+    for (const ch of s) {
+      if (ch === '(' || ch === '[') depth++;
+      else if (ch === ')' || ch === ']') depth--;
+      if (ch === ',' && depth === 0) { out.push(cur); cur = ''; continue; }
+      cur += ch;
+    }
+    out.push(cur);
+    return out.map((v) => v.trim()).filter((v) => v !== '');
+  }
 
   function parsePoints(src, allowedVars) {
     const out = [];
-    const re = new RegExp(POINT_RE.source, 'g');
+    const text = String(src);
+    const finder = /point\s*\(/gi;
     let m;
-    while ((m = re.exec(src))) {
+    while ((m = finder.exec(text))) {
+      const open = m.index + m[0].length - 1;
+      const close = matchParen(text, open);
+      if (close < 0) break;
+      const inner = text.slice(open + 1, close);
+      // 标签是右括号后面紧跟的那一串非空白字符
+      const tail = /^\s*([^\s(<]*)/.exec(text.slice(close + 1));
+      const label = (tail && tail[1] ? tail[1] : '').trim();
+
       const scope = makeScope([]);
-      const coords = [m[1], m[2], m[3]].filter((v) => v !== undefined && v !== '');
+      const coords = splitTopLevel(inner);
       const vals = coords.map((c) => {
         const fn = compileAst(parse(c), []); // 点的坐标只能是常量表达式
         const v = fn(scope);
         if (!Number.isFinite(v)) throw new Error('点的坐标算不出有限值:' + c);
         return v;
       });
-      if (vals.length < 2) throw new Error('点至少需要两个坐标:' + m[0]);
-      out.push({ x: vals[0], y: vals[1], z: vals.length > 2 ? vals[2] : 0, label: (m[4] || '').trim() });
+      if (vals.length < 2) throw new Error('点至少需要两个坐标:' + m[0] + inner + ')');
+      if (vals.length > 3) throw new Error('点最多只能有三个坐标:' + m[0] + inner + ')');
+      out.push({ x: vals[0], y: vals[1], z: vals.length > 2 ? vals[2] : 0, label });
+
+      finder.lastIndex = close + 1;
     }
     // 写了 point( 但一个都没解析出来 —— 比如 point(1) 少了个坐标 ——
     // 这时候静默返回空列表最糟:作者以为画上了,结果什么都没有。
@@ -618,8 +660,13 @@
     const cidx = (i, j, k) => (i * n + j) * n + k;
     const verts = [];
 
-    // 归一化到 [-1,1]³,渲染器只认这个立方体
+    // 归一化到 [-1,1]³,渲染器只认这个立方体。
+    // 三个轴共用同一个 half(取最大的那个)—— 如果各轴各归一化,
+    // 非正方体的包围盒会把球拉成椭球,形状就不是原样了。
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = (z0 + z1) / 2;
+    const half = Math.max(x1 - x0, y1 - y0, z1 - z0) / 2 || 1;
+    // 渲染空间的三个半宽(x←数学 x,y←数学 z,z←数学 y),坐标轴盒子要用它画
+    const ext = [(x1 - x0) / 2 / half, (z1 - z0) / 2 / half, (y1 - y0) / 2 / half];
 
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n; j++) {
@@ -669,9 +716,9 @@
 
           cellOf[cidx(i, j, k)] = verts.length;
           verts.push({
-            x: (wx - cx) / ((x1 - x0) / 2 || 1),
-            y: (wz - cz) / ((z1 - z0) / 2 || 1), // 数学的 z 映射到渲染空间的"上"
-            z: (wy - cy) / ((y1 - y0) / 2 || 1), // 数学的 y 映射到渲染空间的深度
+            x: (wx - cx) / half,
+            y: (wz - cz) / half, // 数学的 z 映射到渲染空间的"上"
+            z: (wy - cy) / half, // 数学的 y 映射到渲染空间的深度
             // 颜色参数用数学 z(高度)归一化,球面这种按高度上色好看
             t: (wz - z0) / (z1 - z0 || 1),
             nx: gx / gl, ny: gz / gl, nz: gy / gl,
@@ -711,7 +758,7 @@
       }
     }
 
-    return { verts, quads, grid: n };
+    return { verts, quads, grid: n, ext };
   }
 
   /* ============================================================
@@ -874,8 +921,7 @@
     [1.00, [255, 95, 208]],   // pink
   ];
 
-  function colormap(t, alpha) {
-    t = Math.max(0, Math.min(1, t));
+  function colormap(t, alpha) {    t = Math.max(0, Math.min(1, t));
     for (var i = 0; i < STOPS.length - 1; i++) {
       var a = STOPS[i], b = STOPS[i + 1];
       if (t <= b[0]) {
@@ -888,6 +934,12 @@
       }
     }
     return 'rgb(255,95,208)';
+  }
+
+  /** 把 #rrggbb 拆成 [r,g,b],给按曲面上色用 */
+  function hexToRgb(hex) {
+    const v = parseInt(String(hex).slice(1), 16);
+    return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
   }
 
   /* ============================================================
@@ -1068,10 +1120,18 @@
     ctx.setTransform(theme.dpr, 0, 0, theme.dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    // 隐式曲面走网格那条路,显式高度场走原来的路
-    var items = state.mesh
-      ? projectMeshQuads(state.mesh, state.cam, w, h, state)
-      : buildQuads(state.surface, state.cam, w, h, state);
+    // 每个曲面各自算四边形,再合成一个列表统一排序 ——
+    // 这样多个曲面之间也能正确互相遮挡。
+    var items = [];
+    (state.surfaces || []).forEach(function (s, si) {
+      var qs = s.kind === 'mesh'
+        ? projectMeshQuads(s.data, state.cam, w, h, state)
+        : buildQuads(s.data, state.cam, w, h, state);
+      for (var k = 0; k < qs.length; k++) {
+        qs[k].surface = si;
+        items.push(qs[k]);
+      }
+    });
     for (var qi = 0; qi < items.length; qi++) items[qi].kind = 'quad';
 
     // 把点也塞进同一个深度序列 —— 这样球背面的点会被球正确地挡住
@@ -1091,6 +1151,7 @@
     items.sort(function (a, b) { return b.depth - a.depth; });
 
     var quads = items;
+    var multiSurface = (state.surfaces || []).length > 1;
 
     for (var i = 0; i < quads.length; i++) {
       var q = quads[i];
@@ -1114,7 +1175,11 @@
         }
         continue;
       }
-      var rgb = colormap(q.t).match(/\d+/g);
+      // 多个曲面时按曲面编号上色(更容易分辨是哪一块);
+      // 只有一个曲面时保持原来的高度渐变色。
+      var rgb = (multiSurface
+        ? hexToRgb(COLORS[q.surface % COLORS.length])
+        : colormap(q.t).match(/\d+/g));
       var m = q.light;
       // 用四边形法线算出的明暗系数调制颜色,曲面才有立体感
       var r = Math.min(255, Math.round(rgb[0] * m));
@@ -1147,17 +1212,25 @@
       return q;
     };
 
+    // 坐标轴盒子的半宽:隐式曲面按它自己的包围盒比例画,显式曲面就是单位立方体
+    var ext = null;
+    for (var si = 0; si < (state.surfaces || []).length; si++) {
+      var d = state.surfaces[si].data;
+      if (d && d.ext) { ext = d.ext; break; }
+    }
+    if (!ext) ext = [1, 1, 1];
+
     // 立方体左下后角的三条棱 → 坐标轴
     var axes = [
-      { to: [1, 0, 0], label: 'x' },
-      { to: [0, 0, 1], label: 'y' },
-      { to: [0, 1, 0], label: 'z' },
+      { to: [ext[0], 0, 0], label: 'x' },
+      { to: [0, 0, ext[2]], label: 'y' },
+      { to: [0, ext[1], 0], label: 'z' },
     ];
-    var origin = P(-1, -1, -1);
+    var origin = P(-ext[0], -ext[1], -ext[2]);
 
     ctx.lineWidth = 1.6;
     axes.forEach(function (ax) {
-      var end = P(-1 + ax.to[0] * 2, -1 + ax.to[1] * 2, -1 + ax.to[2] * 2);
+      var end = P(-ext[0] + ax.to[0] * 2, -ext[1] + ax.to[1] * 2, -ext[2] + ax.to[2] * 2);
       ctx.strokeStyle = theme.axis;
       ctx.beginPath();
       ctx.moveTo(origin.x, origin.y);
@@ -1179,7 +1252,7 @@
     for (var sx = 0; sx <= 1; sx++) {
       for (var sy = 0; sy <= 1; sy++) {
         for (var sz = 0; sz <= 1; sz++) {
-          corners.push(P(sx * 2 - 1, sy * 2 - 1, sz * 2 - 1));
+          corners.push(P((sx * 2 - 1) * ext[0], (sy * 2 - 1) * ext[1], (sz * 2 - 1) * ext[2]));
         }
       }
     }
@@ -1258,23 +1331,40 @@
       });
 
       if (kind === '3d') {
-        const surface = compiled.find(function (it) { return it.type !== 'point'; });
-        const o = Object.assign({}, payload.opts, { mask: surface ? surface.mask : null });
-        if (surface && surface.type === 'implicit') {
-          state.mesh = surfaceNets(compileImplicit(surface.expr, varNames), o);
-        } else if (surface) {
-          state.surface = buildSurface(surface.expr, o);
-        }
+        // 一个图里可以有多个曲面/等值面,各自带自己的约束
+        const surfaceItems = compiled.filter(function (it) { return it.type !== 'point'; });
+        state.surfaces = surfaceItems.map(function (it) {
+          const o = Object.assign({}, payload.opts, { mask: it.mask });
+          if (it.type === 'implicit') {
+            return { kind: 'mesh', data: surfaceNets(compileImplicit(it.expr, varNames), o) };
+          }
+          return { kind: 'surface', data: buildSurface(it.expr, o) };
+        });
         state.cam = { az: -0.62, el: 0.52, dist: 3.4, focal: 3.4, zoom: 1 };
 
         // 点从数学坐标换算到和曲面同一套归一化立方体里。
         // 显式曲面的 opts.z 是"颜色映射范围"、允许为 null,这时用曲面实际的高度范围兜底。
         const [ax, bx] = payload.opts.x;
         const [ay, by] = payload.opts.y;
-        const zr = Array.isArray(payload.opts.z)
-          ? payload.opts.z
-          : (state.surface ? [state.surface.zmin, state.surface.zmax] : [-1, 1]);
+        let zr = payload.opts.z;
+        if (!Array.isArray(zr)) {
+          const zs = state.surfaces
+            .filter(function (s) { return s.kind === 'surface'; })
+            .map(function (s) { return [s.data.zmin, s.data.zmax]; });
+          zr = zs.length
+            ? [Math.min.apply(null, zs.map((v) => v[0])), Math.max.apply(null, zs.map((v) => v[1]))]
+            : [-1, 1];
+        }
         const cx = (ax + bx) / 2, cy = (ay + by) / 2, cz = (zr[0] + zr[1]) / 2;
+        // 隐式曲面(surfaceNets)三个轴共用一个 half,点必须跟着用同一套比例,
+        // 否则 x/y/z 范围不一样时点会飘到曲面外面去。
+        const hasMesh = state.surfaces.some(function (s) { return s.kind === 'mesh'; });
+        const half = hasMesh
+          ? (Math.max(bx - ax, by - ay, zr[1] - zr[0]) / 2 || 1)
+          : 0;
+        const hx = hasMesh ? half : ((bx - ax) / 2 || 1);
+        const hy = hasMesh ? half : ((by - ay) / 2 || 1);
+        const hz = hasMesh ? half : ((zr[1] - zr[0]) / 2 || 1);
         const scope = makeScope(['x', 'y', 'z']);
         state.points = compiled.filter(function (it) {
           if (it.type !== 'point') return false;
@@ -1283,9 +1373,9 @@
           return it.mask(scope);
         }).map(function (p) {
           return {
-            nx: (p.x - cx) / ((bx - ax) / 2 || 1),
-            ny: (p.z - cz) / ((zr[1] - zr[0]) / 2 || 1),
-            nz: (p.y - cy) / ((by - ay) / 2 || 1),
+            nx: (p.x - cx) / hx,
+            ny: (p.z - cz) / hz,
+            nz: (p.y - cy) / hy,
             label: p.label,
           };
         });
