@@ -43,7 +43,8 @@ const routes = files
   .filter((f) => f.endsWith(`${path.sep}index.html`))
   .map((f) => {
     const rel = path.relative(publicDir, path.dirname(f)).replace(/\\/g, '/');
-    return rel === '.' ? '/' : `/${rel}/`;
+    // 站点根目录:path.relative 对同一目录返回空串
+    return rel === '' || rel === '.' ? '/' : `/${rel}/`;
   })
   .sort();
 
