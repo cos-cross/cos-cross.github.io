@@ -18,7 +18,11 @@
   </div>
   <%- partial('_partial/pager') %>
   <% } else { %>
-  <p class="empty-tip">还没有文章,去 <code>source/_posts/</code> 里写下第一篇吧。</p>
+  <div class="empty-state">
+    <span class="empty-icon" aria-hidden="true">♪</span>
+    <p class="empty-title">还没有发布文章</p>
+    <p class="empty-desc">第一篇正在路上,稍后再来看看吧。</p>
+  </div>
   <% } %>
 </section>
 

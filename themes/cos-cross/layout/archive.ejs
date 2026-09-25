@@ -61,5 +61,9 @@
 
 <%- partial('_partial/pager') %>
 <% } else { %>
-<p class="empty-tip">这里还没有内容。</p>
+<div class="empty-state">
+  <span class="empty-icon" aria-hidden="true">♪</span>
+  <p class="empty-title">这里还没有内容</p>
+  <p class="empty-desc">等第一篇写出来,它就会出现在这里。</p>
+</div>
 <% } %>

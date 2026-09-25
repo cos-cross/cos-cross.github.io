@@ -76,25 +76,41 @@ for (const file of files) {
   }
 }
 
-// 关键结构抽查
+const postFiles = files.filter((f) => /[\\/]posts[\\/].+index\.html$/.test(f));
+const hasPosts = postFiles.length > 0;
+const hasTags = files.some((f) => /[\\/]tags[\\/].+index\.html$/.test(f));
+
+// 关键结构抽查。没有文章时首页不渲染文章卡片和标签云,
+// 改为要求出现空状态提示(由 scripts/empty-site-fallback.js 兜底生成首页)。
 const home = path.join(publicDir, 'index.html');
-if (existsSync(home)) {
+if (!existsSync(home)) {
+  problems.push('缺少 index.html —— 首页没有生成');
+} else {
   const html = await readFile(home, 'utf8');
-  for (const [label, pattern] of [
+  const expected = [
     ['导航', /class="[^"]*\bsite-nav\b/],
     ['首页大屏', /class="[^"]*\bhero-title\b/],
-    ['文章卡片', /class="[^"]*\bpost-card\b/],
     ['项目卡片', /class="[^"]*\bproject-card\b/],
-    ['标签云', /class="[^"]*\btag-cloud\b/],
     ['页脚', /class="[^"]*\bsite-footer\b/],
     ['连击 HUD', /class="[^"]*\bcombo-hud\b/],
-  ]) {
+  ];
+  if (hasPosts) {
+    expected.push(['文章卡片', /class="[^"]*\bpost-card\b/]);
+  } else {
+    expected.push(['空状态提示', /class="[^"]*\bempty-state\b/]);
+  }
+  // 标签云只在真的存在标签时才渲染
+  if (hasTags) expected.push(['标签云', /class="[^"]*\btag-cloud\b/]);
+  for (const [label, pattern] of expected) {
     if (!pattern.test(html)) problems.push(`index.html: 缺少${label}`);
   }
 }
 
-const postFiles = files.filter((f) => /[\\/]posts[\\/].+index\.html$/.test(f));
-if (!postFiles.length) problems.push('没有生成任何文章页面');
+// 「文章」导航指向 /archives/,空站时靠兜底生成器补上,不能 404
+if (!existsSync(path.join(publicDir, 'archives', 'index.html'))) {
+  problems.push('缺少 archives/index.html —— 导航里的「文章」会 404');
+}
+
 for (const f of postFiles) {
   const html = await readFile(f, 'utf8');
   if (!/class="[^"]*\bpost-content\b/.test(html)) problems.push(`${path.relative(publicDir, f)}: 缺少正文容器`);
@@ -106,7 +122,7 @@ const totalKB = ((await size) / 1024).toFixed(1);
 
 console.log('构建产物自检');
 console.log(`  HTML 页面 : ${stats.html}`);
-console.log(`  文章页面  : ${postFiles.length}`);
+console.log(`  文章页面  : ${postFiles.length}${hasPosts ? '' : '(空站模式,由 scripts/empty-site-fallback.js 兜底)'}`);
 console.log(`  站内链接  : ${stats.links}`);
 console.log(`  总体积    : ${totalKB} KB`);
 console.log('');

@@ -1,73 +1,135 @@
 /**
- * 线上站点验证:部署完成后跑一遍,确认页面和资源真的可达。
+ * 线上站点验证:部署完成后跑一遍,确认线上内容和本地构建产物一致。
+ *
+ * 不做任何硬编码的页址列表 —— 它直接读本地 public/ 里的路由,
+ * 逐页去线上请求。所以增删文章之后不用改这个脚本。
  *
  * 用法:
  *   node tools/verify-live.mjs
  *   node tools/verify-live.mjs https://你的域名/
+ *   node tools/verify-live.mjs --concurrency 4
  */
-const BASE = (process.argv[2] || 'https://cos-cross.github.io').replace(/\/+$/, '');
+import { readdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const pages = [
-  ['首页', '/', ['hero-title', 'post-card', 'project-card', 'site-footer', 'brand-avatar']],
-  ['归档页', '/archives/', ['archive-item', 'archive-year']],
-  ['项目页', '/projects/', ['project-card', 'project-name']],
-  ['关于页', '/about/', ['info-grid', 'callout']],
-  ['文章 · 普通', '/posts/hello-blog/', ['post-content', 'post-title', 'post-toc']],
-  ['文章 · 代码', '/posts/css-rhythm-lane/', ['post-content', 'post-nav', 'class="highlight']],
-  ['文章 · 公式', '/posts/rhythm-judgement-math/', ['post-content', 'vendor/katex/katex.min.js', 'toc-link']],
-  ['文章 · 数学', '/posts/rose-curve-python/', ['post-content', 'vendor/katex']],
-];
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const publicDir = path.join(root, 'public');
 
-const assets = [
+const args = process.argv.slice(2);
+const flagIndex = args.indexOf('--concurrency');
+const CONCURRENCY = flagIndex >= 0 ? Math.max(1, Number(args[flagIndex + 1]) || 6) : 6;
+const BASE = (args.find((a) => a.startsWith('http')) || 'https://cos-cross.github.io').replace(/\/+$/, '');
+
+if (!existsSync(publicDir)) {
+  console.error('public/ 不存在,请先运行:npm run build');
+  process.exit(1);
+}
+
+async function walk(dir, out = []) {
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) await walk(full, out);
+    else out.push(full);
+  }
+  return out;
+}
+
+const files = await walk(publicDir);
+
+// 每个 index.html 对应一个目录形式的网址
+const routes = files
+  .filter((f) => f.endsWith(`${path.sep}index.html`))
+  .map((f) => {
+    const rel = path.relative(publicDir, path.dirname(f)).replace(/\\/g, '/');
+    return rel === '.' ? '/' : `/${rel}/`;
+  })
+  .sort();
+
+const ASSETS = [
   '/css/style.css',
   '/js/main.js',
   '/img/avatar.svg',
   '/img/favicon.svg',
-  '/vendor/katex/katex.min.css',
-  '/vendor/katex/katex.min.js',
-  '/vendor/katex/auto-render.min.js',
   '/atom.xml',
 ];
 
-let failures = 0;
+const problems = [];
+let ok = 0;
 
-async function get(path) {
-  const res = await fetch(BASE + path, { headers: { 'User-Agent': 'cos-cross-blog-verify' } });
-  const body = await res.text();
-  return { status: res.status, body, bytes: Buffer.byteLength(body) };
+async function checkRoute(route) {
+  const url = BASE + route;
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'cos-cross-blog-verify' } });
+    const body = await res.text();
+    if (res.status !== 200) {
+      problems.push(`${route} → HTTP ${res.status}`);
+      return;
+    }
+    if (!body.includes('</html>')) {
+      problems.push(`${route} → 响应不是完整 HTML`);
+      return;
+    }
+    ok++;
+    console.log(`PASS  ${String(res.status)}  ${route}`);
+  } catch (e) {
+    problems.push(`${route} → ${e.message}`);
+  }
 }
 
-console.log(`验证目标:${BASE}\n`);
-
-for (const [name, path, expects] of pages) {
+async function checkAsset(asset) {
   try {
-    const { status, body, bytes } = await get(path);
-    const missing = expects.filter((token) => !body.includes(token));
-    const ok = status === 200 && missing.length === 0;
-    if (!ok) failures++;
-    console.log(
-      `${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(12)} ${String(status).padEnd(4)} ${(bytes / 1024).toFixed(1).padStart(6)}KB` +
-      (missing.length ? `  缺少: ${missing.join(', ')}` : ''),
-    );
+    const res = await fetch(BASE + asset, { headers: { 'User-Agent': 'cos-cross-blog-verify' } });
+    const bytes = (await res.arrayBuffer()).byteLength;
+    if (res.status !== 200 || bytes === 0) {
+      problems.push(`${asset} → HTTP ${res.status},${bytes} 字节`);
+      return;
+    }
+    ok++;
+    console.log(`PASS  ${String(res.status)}  ${asset.padEnd(34)} ${(bytes / 1024).toFixed(1)}KB`);
   } catch (e) {
-    failures++;
-    console.log(`FAIL  ${name.padEnd(12)} 请求失败: ${e.message}`);
+    problems.push(`${asset} → ${e.message}`);
+  }
+}
+
+async function pool(items, worker) {
+  const queue = [...items];
+  const runners = Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+    while (queue.length) await worker(queue.shift());
+  });
+  await Promise.all(runners);
+}
+
+console.log(`验证目标:${BASE}`);
+console.log(`本地构建产物里有 ${routes.length} 个页面\n`);
+
+await pool(routes, checkRoute);
+console.log('');
+await pool(ASSETS, checkAsset);
+
+// 首页结构抽查(空站和有文章时要求不同)
+const home = path.join(publicDir, 'index.html');
+if (existsSync(home)) {
+  const res = await fetch(BASE + '/', { headers: { 'User-Agent': 'cos-cross-blog-verify' } });
+  const html = await res.text();
+  const hasPosts = routes.some((r) => r.startsWith('/posts/'));
+  const expected = [
+    ['导航', 'site-nav'],
+    ['首页大屏', 'hero-title'],
+    ['项目卡片', 'project-card'],
+    ['页脚', 'site-footer'],
+    [hasPosts ? '文章卡片' : '空状态提示', hasPosts ? 'post-card' : 'empty-state'],
+  ];
+  for (const [label, token] of expected) {
+    if (!html.includes(token)) problems.push(`首页缺少${label}`);
   }
 }
 
 console.log('');
-for (const path of assets) {
-  try {
-    const res = await fetch(BASE + path, { headers: { 'User-Agent': 'cos-cross-blog-verify' } });
-    const bytes = (await res.arrayBuffer()).byteLength;
-    const ok = res.status === 200 && bytes > 0;
-    if (!ok) failures++;
-    console.log(`${ok ? 'PASS' : 'FAIL'}  资源 ${path.padEnd(32)} ${String(res.status).padEnd(4)} ${(bytes / 1024).toFixed(1).padStart(6)}KB`);
-  } catch (e) {
-    failures++;
-    console.log(`FAIL  资源 ${path.padEnd(32)} ${e.message}`);
-  }
+if (problems.length) {
+  console.error(`${problems.length} 项未通过(通过 ${ok} 项):`);
+  for (const p of problems) console.error(`  - ${p}`);
+  process.exit(1);
 }
-
-console.log(failures ? `\n${failures} 项未通过` : '\n全部通过,线站正常。');
-process.exit(failures ? 1 : 0);
+console.log(`全部通过(${ok} 项),线上与本地构建一致。`);

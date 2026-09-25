@@ -35,6 +35,8 @@
 │   │   ├── archive.ejs       # 归档 / 分类 / 标签
 │   │   └── _partial/         # 导航、页脚、卡片等片段
 │   └── source/               # css / js / 图片 / KaTeX
+├── scripts/
+│   └── empty-site-fallback.js  # Hexo 插件:零文章时兜底生成首页 / 归档 / RSS
 ├── tools/
 │   ├── deploy.mjs            # 部署到 gh-pages
 │   ├── check.mjs             # 构建产物自检
@@ -43,7 +45,12 @@
 └── public/                   # 构建产物(不进版本库)
 ```
 
-`tools/` 这个名字是刻意的:**Hexo 会自动把根目录下的 `scripts/` 当作插件加载**,里面放 ESM 脚本会直接报错,所以辅助脚本统一放在 `tools/`。
+`scripts/` 和 `tools/` 的分工要说清楚:
+
+- **`scripts/` 是 Hexo 的插件目录**,会被自动加载。它必须是 **CommonJS**,因为 Hexo 把文件包进 `(function(exports, require, module, __filename, __dirname, hexo){...})` 执行 —— 写 `import` 会直接语法错误,而且 `hexo` 是**注入的函数参数**,不是模块导出,写 `module.exports = function (hexo) {}` 不会被执行。
+- **`tools/` 是自己写的辅助脚本**,Hexo 不管,所以可以放心用 ESM。
+
+`scripts/empty-site-fallback.js` 是必需的:Hexo 官方的 index / archive 生成器在**零文章**时什么都不输出,首页和导航里的「文章」会直接 404。这个插件只在没有文章时补上最小页面,有了文章就完全不介入。
 
 ## 安装
 
@@ -67,23 +74,62 @@ npm install --ignore-scripts
 
 ## 写一篇文章
 
+### 1. 新建
+
 ```bash
-npm run new "文章标题"
+npm run new "文章标题"          # → source/_posts/文章标题.md
 ```
 
-生成的 `.md` 头部是 front-matter:
+**文件名决定网址。** Hexo 用文件名当 slug,所以中文标题会得到 `posts/文章标题/` 这样被百分号转义的长网址。想要干净的 URL,建完把文件改名成英文:
+
+```bash
+npm run new "音游判定与数学"
+# 然后把 source/_posts/音游判定与数学.md 改名为 rhythm-judgement-math.md
+# 网址就是 https://cos-cross.github.io/posts/rhythm-judgement-math/
+```
+
+`title` 写在 front-matter 里,和文件名无关,所以改文件名不影响页面标题。
+
+### 2. 写内容
 
 ```yaml
 ---
-title: 文章标题
-date: 2026-04-12 21:30:00
-categories: 随笔
-tags: [博客, Hexo]
-math: true      # 需要渲染公式时加上
+title: 音游判定与数学:你的 PERFECT 为什么总是差一点点
+date: 2026-09-25 21:30:00
+categories: 音游
+tags: [音游, 数学, 概率]
+math: true              # 需要渲染 $公式$ 时才加,不加就不会加载 KaTeX
 ---
 ```
 
-正文里插入一行 `<!-- more -->`,首页摘要就截到那里。
+正文用普通 Markdown。几个约定:
+
+| 写法 | 效果 |
+| --- | --- |
+| `<!-- more -->` | 首页摘要截到这里,不写就是全文摘要 |
+| `## 二级标题` | 自动生成锚点,并出现在右侧目录里 |
+| ` ```js ` 代码块 | 高亮 + 行号 + 悬停复制按钮 |
+| `$x^2$` / `$$...$$` | 行内 / 独立公式(需要 `math: true`) |
+| `categories: 音游` | 生成 `/categories/音游/` 页面 |
+| `tags: [a, b]` | 生成 `/tags/a/` 页面,并进首页标签云 |
+
+> 注意:公式里的下划线会被 Markdown 当成斜体。写 `\sigma_x` 请改成 `\sigma` 加文字说明,或者用 `\sigma_{x}` 之外的方式绕开 —— 这是 Markdown + 数学混排的经典坑。
+
+### 3. 本地预览
+
+```bash
+npm run server      # http://localhost:4000,改文件会自动刷新
+```
+
+### 4. 发布
+
+```bash
+npm run check       # 先自检一遍(死链、模板残留、关键结构)
+npm run deploy      # 构建 + 推送到 gh-pages
+npm run verify      # 等 Pages 构建完(约半分钟),验证线上
+```
+
+前两步在本地几秒就能跑完,推上去之后 GitHub Pages 构建大约需要 20~60 秒。
 
 ## 部署
 
