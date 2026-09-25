@@ -349,6 +349,94 @@
     })();
   })();
 
+  /* ---------- 10.1 媒体背景(视频壁纸) ---------- */
+  (function mediaBackground() {
+    var wrap = $('#bg-media');
+    var video = $('#bg-video');
+    if (!wrap) return;
+
+    var toggle = $('#bg-toggle');
+    var KEY = 'cos-cross-bg-paused';
+    var mobile = wrap.getAttribute('data-mobile') || 'poster';
+
+    function pausedPref() {
+      try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
+    }
+
+    function savePaused(v) {
+      try { localStorage.setItem(KEY, v ? '1' : '0'); } catch (e) { /* 忽略 */ }
+    }
+
+    function markPaused(v) {
+      wrap.classList.toggle('is-paused', v);
+      if (toggle) {
+        toggle.classList.toggle('is-paused', v);
+        toggle.setAttribute('aria-label', v ? '播放背景动画' : '暂停背景动画');
+      }
+    }
+
+    if (!video) {
+      // 只有静态图:开关没有意义,直接隐藏按钮
+      if (toggle) toggle.style.display = 'none';
+      return;
+    }
+
+    // 手机端默认只显示封面图,省流量;data-mobile="video" 时才加载
+    var allowVideo = mobile === 'video'
+      || (mobile !== 'off' && window.innerWidth >= 760);
+
+    // 用户开了「减少动态效果」就不自动播放,只显示封面
+    if (reduceMotion) allowVideo = false;
+
+    var loaded = false;
+    function ensureLoaded() {
+      if (loaded) return;
+      loaded = true;
+      video.src = video.getAttribute('data-src');
+      video.load();
+    }
+
+    function play() {
+      ensureLoaded();
+      var p = video.play();
+      if (p && typeof p.catch === 'function') p.catch(function () { /* 自动播放被拦截,保留封面 */ });
+    }
+
+    video.addEventListener('loadeddata', function () { video.classList.add('is-ready'); });
+
+    var paused = pausedPref();
+    markPaused(paused);
+
+    if (allowVideo && !paused) {
+      // 首屏优先渲染内容,背景视频晚一点再加载
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(play, { timeout: 2500 });
+      } else {
+        setTimeout(play, 400);
+      }
+    }
+
+    if (toggle) {
+      toggle.addEventListener('click', function () {
+        paused = !paused;
+        savePaused(paused);
+        markPaused(paused);
+        if (paused) {
+          video.pause();
+        } else if (allowVideo) {
+          play();
+        }
+      });
+    }
+
+    // 切到后台就暂停,别白白烧电
+    document.addEventListener('visibilitychange', function () {
+      if (!loaded) return;
+      if (document.hidden) video.pause();
+      else if (!paused && allowVideo) play();
+    });
+  })();
+
   /* ---------- 11. 数学公式(仅在文章声明 math: true 时) ---------- */
   (function math() {
     var content = $('#post-content');

@@ -182,6 +182,77 @@ p { margin: 0; }
   transition: width .12s linear;
 }
 
+/* ---------- 2.1 媒体背景(视频 / 图片) ---------- */
+.bg-media {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background-color: var(--bg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+.bg-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  /* 模糊会让画面边缘透出底色,所以放大一点点补回来 */
+  filter: blur(var(--bg-blur, 0px));
+  transform: scale(var(--bg-scale, 1.06));
+  opacity: 0;
+  transition: opacity .8s var(--ease);
+}
+.bg-video.is-ready { opacity: 1; }
+
+/* 压暗遮罩:保证正文可读性,同时保留上下渐变压暗 */
+.bg-scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--bg) 78%, transparent) 0%,
+      transparent 26%,
+      transparent 58%,
+      color-mix(in srgb, var(--bg) 92%, transparent) 100%),
+    var(--bg);
+  opacity: var(--bg-overlay, .62);
+}
+
+/* 媒体背景模式下,网格线保留但弱化;飘浮音符也要让位,不然画面太吵 */
+.bg-fx-light .grid-lines { opacity: .35; }
+.bg-media ~ .note-canvas { opacity: .26; }
+
+.bg-toggle {
+  position: fixed;
+  right: 18px;
+  bottom: 70px;
+  z-index: 41;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--text-2);
+  transition: all .25s var(--ease);
+}
+.bg-toggle:hover { color: #07070f; background: var(--grad-main); border-color: transparent; }
+.bg-toggle .ico-play { display: none; }
+.bg-toggle.is-paused .ico-play { display: block; }
+.bg-toggle.is-paused .ico-pause { display: none; }
+
+/* 背景暂停时,视频淡出、只剩封面图 */
+.bg-media.is-paused .bg-video { opacity: 0; }
+
 /* ---------- 3. 顶部导航 ---------- */
 .site-nav {
   position: sticky;

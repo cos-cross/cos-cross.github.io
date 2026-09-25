@@ -24,6 +24,7 @@
 ├── source/
 │   ├── _posts/               # 文章,一篇一个 .md
 │   ├── _data/projects.yml    # 项目清单,首页和 /projects/ 都读它
+│   ├── media/                # 背景视频 / 图片(npm run wallpaper 导入)
 │   ├── about/index.md        # 关于页
 │   └── projects/index.md     # 项目页
 ├── themes/cos-cross/
@@ -41,6 +42,7 @@
 │   ├── deploy.mjs            # 部署到 gh-pages
 │   ├── check.mjs             # 构建产物自检
 │   ├── verify-live.mjs       # 线上站点验证
+│   ├── import-wallpaper.mjs  # 从 Wallpaper Engine 导入壁纸当背景
 │   └── vendor-katex.mjs      # 复制 KaTeX 运行时资源
 └── public/                   # 构建产物(不进版本库)
 ```
@@ -69,8 +71,79 @@ npm install --ignore-scripts
 | `npm run check` | 构建并自检产物(死链、模板残留、关键结构) |
 | `npm run deploy` | 构建并发布到 `gh-pages` 分支 |
 | `npm run verify` | 部署后验证线上站点(页面 + 静态资源是否真的可达) |
+| `npm run wallpaper -- 2903241954` | 从 Wallpaper Engine 导入壁纸当背景 |
+| `npm run wallpaper -- --list` | 列出本机所有 Wallpaper Engine 壁纸 |
 | `npm run new "标题"` | 新建一篇文章 |
 | `npm run vendor:katex` | 从 `node_modules/katex` 重新复制运行时资源 |
+
+## 把背景换成 Wallpaper Engine 的壁纸
+
+先说清楚**为什么不能直接把壁纸拿来用**:Wallpaper Engine 的壁纸分三种类型,能用的程度完全不一样。
+
+| 壁纸类型 | 文件 | 能不能当网页背景 |
+| --- | --- | --- |
+| `video` | `xxx.mp4` | ✅ **直接能用**,而且效果和 WE 里一模一样 |
+| `web` | `index.html` + 一堆资源 | ⚠️ 本质是个网页,得自己嵌 iframe |
+| `scene` | `scene.pkg`(打包的) | ❌ 动作是 WE 引擎用 DirectX 实时算的,**导不出来** |
+
+`scene` 是最常见的类型,也是最麻烦的 —— 它不是一个视频文件,而是一堆贴图 + 着色器,离开 WE 引擎就是一堆素材。想用只有两条路:用自带预览图(见下面的坑),或者**录屏**。
+
+### 用法
+
+```bash
+# 先看看本机有哪些壁纸,以及每张是什么类型
+npm run wallpaper -- --list
+
+# 导入指定壁纸(Steam 创意工坊 ID)
+npm run wallpaper -- 2903241954
+```
+
+工具会自动:定位 Steam 库 → 读 `project.json` 判断类型 → 压视频 → 抽封面 → 改好主题配置。
+
+对 `video` 类型,它会用 ffmpeg 压成 720p / 无音轨 / faststart 的 mp4,通常能压到原文件的 **5%~10%**:
+
+```text
+源视频:咲弥 电脑.mp4  8.7 MB   (4K / 12 秒 / 6 Mbps)
+视频:/media/background.mp4  0.5 MB
+封面:/media/background.jpg  152 KB
+```
+
+想进一步控制体积:
+
+```bash
+npm run wallpaper -- 2903241954 --width 960 --crf 32 --duration 10
+npm run wallpaper -- 2903241954 --width 1920 --crf 26      # 要更清晰
+```
+
+没装 ffmpeg 也能跑,只是会原样复制(体积可能大到不适合当背景),工具会打印出可手动执行的命令。
+
+### 调效果
+
+改 `themes/cos-cross/_config.yml`:
+
+```yaml
+background:
+  mode: media
+  video: '/media/background.mp4'
+  poster: '/media/background.jpg'
+  overlay: 0.62     # 压暗程度。文字看不清就调大,壁纸太淡就调小
+  blur: 3           # 模糊像素。3~6 能明显提升文字可读性
+  mobile: poster    # 手机上只显示封面图,不下载视频
+  control: true     # 右下角显示「暂停背景」按钮
+```
+
+几个已经做好的取舍:
+
+- **手机上不加载视频**(`mobile: poster`),只显示 152 KB 的封面图;
+- 系统开了「减少动态效果」就不自动播放,只留封面;
+- 切到别的标签页自动暂停,不白烧电;
+- 视频在首屏渲染完之后才加载,不挡首屏。
+
+### 两个坑
+
+1. **`scene` 类型的预览图只有 160×160 左右。** 那是 Wallpaper Engine 列表里的缩略图,拉到全屏会糊成一团。工具会检测尺寸并提醒你;这时要么把 `blur` 开到 40 当抽象色块用,要么老老实实录屏。
+2. **壁纸版权。** 创意工坊的壁纸是别人画的 / 别人剪的,自己电脑上随便用,但**公开挂到网站上属于二次分发**,最好先确认作者允许,或者换成自己有权限的素材。
+
 
 ## 写一篇文章
 

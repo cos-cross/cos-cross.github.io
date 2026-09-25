@@ -11,6 +11,7 @@
     "deploy": "hexo generate && node tools/deploy.mjs",
     "check": "hexo generate && node tools/check.mjs",
     "verify": "node tools/verify-live.mjs",
+    "wallpaper": "node tools/import-wallpaper.mjs",
     "vendor:katex": "node tools/vendor-katex.mjs"
   },
   "hexo": {

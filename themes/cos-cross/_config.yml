@@ -73,3 +73,30 @@ effects:
   particles: true   # 飘浮音符粒子
   combo: true       # 右下角连击 HUD
   reveal: true      # 滚动淡入
+
+# ============================================================
+#  背景
+#  mode: aurora = 默认的霓虹极光(纯 CSS,零流量)
+#        media  = 用你自己的视频 / 图片(比如 Wallpaper Engine 的壁纸)
+#        none   = 纯色背景
+#
+#  换成壁纸的推荐流程:
+#    1. npm run wallpaper -- <创意工坊ID>   把壁纸里的媒体文件导进来
+#    2. 打开下面的 mode: media
+#    3. npm run deploy
+# ============================================================
+background:
+  mode: media
+
+  # mode: media 时生效。视频优先,留空则用 image。
+  video: '/media/background.mp4'
+  image: ''
+  poster: '/media/background.jpg'
+
+  overlay: 0.62        # 压暗程度 0~1。文字看不清就调大,想让壁纸更明显就调小
+  blur: 3              # 背景模糊(px)。3~6 能显著提升文字可读性,0 = 不模糊
+  scale: 1.06          # 轻微放大,避免模糊后边缘露出底色
+
+  mobile: poster       # 手机上显示:poster(只显示封面,省流量)/ video / off
+  control: true        # 右下角显示「暂停背景」按钮
+

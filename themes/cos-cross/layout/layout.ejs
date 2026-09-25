@@ -3,13 +3,50 @@
 <%- partial('_partial/head') %>
 <body class="page-<%= is_home() ? 'home' : (is_post() ? 'post' : (is_archive() ? 'archive' : 'page')) %>">
 
-  <% if (theme.effects && theme.effects.aurora !== false) { %>
+  <%
+    var bg = theme.background || {};
+    var bgMode = bg.mode || 'aurora';
+    var bgPoster = bg.poster || bg.image || '';
+  %>
+
+  <% if (bgMode === 'media' && (bg.video || bg.image)) { %>
+  <!-- 媒体背景:视频 / 图片,来自 Wallpaper Engine 等。用 npm run wallpaper 导入 -->
+  <%
+    var bgStyle = [
+      '--bg-overlay: ' + (bg.overlay == null ? 0.62 : bg.overlay),
+      '--bg-blur: ' + (bg.blur == null ? 3 : bg.blur) + 'px',
+      '--bg-scale: ' + (bg.scale == null ? 1.06 : bg.scale)
+    ];
+    if (bgPoster) bgStyle.push("background-image: url('" + url_for(bgPoster) + "')");
+  %>
+  <div class="bg-media"
+       id="bg-media"
+       data-mobile="<%= bg.mobile || 'poster' %>"
+       style="<%= bgStyle.join('; ') %>"
+       aria-hidden="true">
+    <% if (bg.video) { %>
+    <video class="bg-video"
+           id="bg-video"
+           data-src="<%= url_for(bg.video) %>"
+           <% if (bgPoster) { %>poster="<%= url_for(bgPoster) %>"<% } %>
+           muted loop playsinline preload="none"></video>
+    <% } %>
+    <span class="bg-scrim"></span>
+  </div>
+  <% } %>
+
+  <% if (bgMode === 'aurora' && theme.effects && theme.effects.aurora !== false) { %>
   <div class="bg-fx" aria-hidden="true">
     <span class="orb orb-1"></span>
     <span class="orb orb-2"></span>
     <span class="orb orb-3"></span>
     <span class="grid-lines"></span>
     <span class="scanline"></span>
+  </div>
+  <% } else if (bgMode === 'media') { %>
+  <!-- 媒体背景时保留网格线,让霓虹感不至于断掉 -->
+  <div class="bg-fx bg-fx-light" aria-hidden="true">
+    <span class="grid-lines"></span>
   </div>
   <% } %>
   <% if (theme.effects && theme.effects.particles !== false) { %>
@@ -32,6 +69,13 @@
     <span class="combo-num" id="combo-num">0</span>
     <span class="combo-judge" id="combo-judge"></span>
   </div>
+  <% } %>
+
+  <% if (bgMode === 'media' && bg.control !== false && bg.video) { %>
+  <button class="bg-toggle" id="bg-toggle" type="button" aria-label="暂停背景动画" title="暂停 / 播放背景动画">
+    <svg class="ico-pause" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5h3v14H8zm5 0h3v14h-3z" fill="currentColor"/></svg>
+    <svg class="ico-play" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5l11 7-11 7z" fill="currentColor"/></svg>
+  </button>
   <% } %>
 
   <button class="to-top" id="to-top" type="button" aria-label="回到顶部">
