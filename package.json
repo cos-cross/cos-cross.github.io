@@ -12,6 +12,7 @@
     "check": "hexo generate && node tools/check.mjs",
     "verify": "node tools/verify-live.mjs",
     "projects": "node tools/manage-projects.mjs",
+    "avatar": "node tools/import-avatar.mjs",
     "wallpaper": "node tools/import-wallpaper.mjs",
     "vendor:katex": "node tools/vendor-katex.mjs"
   },

@@ -14,7 +14,9 @@ menu:
 profile:
   name: Cos-Cross
   handle: "@Cos_Cross"
-  avatar: /img/avatar.svg
+  avatar: '/img/avatar.jpg'
+  favicon: '/img/favicon-32.png'
+  appleTouchIcon: '/img/apple-touch-icon.png'
   bio: 高中生 · 编程 / 数学 / 音游
 
 # 首页大屏(hero)

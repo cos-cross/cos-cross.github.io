@@ -6,6 +6,8 @@
   var pageDesc = rawDesc ? truncate(strip_html(rawDesc), 140) : (config.description || '');
   var canonical = full_url_for(page.path || '/');
   var avatarUrl = full_url_for(theme.profile.avatar);
+  var favicon = theme.profile.favicon || '/img/favicon.svg';
+  var faviconType = /\.svg$/i.test(favicon) ? 'image/svg+xml' : 'image/png';
 %>
 <head>
   <meta charset="utf-8">
@@ -25,7 +27,10 @@
   <meta property="og:image" content="<%= avatarUrl %>">
   <meta name="twitter:card" content="summary">
 
-  <link rel="icon" href="<%= url_for('/img/favicon.svg') %>" type="image/svg+xml">
+  <link rel="icon" type="<%= faviconType %>" href="<%= url_for(favicon) %>">
+  <% if (theme.profile.appleTouchIcon) { %>
+  <link rel="apple-touch-icon" sizes="180x180" href="<%= url_for(theme.profile.appleTouchIcon) %>">
+  <% } %>
   <link rel="alternate" type="application/atom+xml" title="<%= config.title %>" href="<%= url_for('/atom.xml') %>">
   <link rel="stylesheet" href="<%= url_for('/css/style.css') %>">
   <% if (page.math) { %>

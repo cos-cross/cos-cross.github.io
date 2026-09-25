@@ -38,11 +38,15 @@
 │   └── source/               # css / js / 图片 / KaTeX
 ├── scripts/
 │   └── empty-site-fallback.js  # Hexo 插件:零文章时兜底生成首页 / 归档 / RSS
+├── assets/
+│   └── avatar-source.jpg      # 头像原图(不进主题目录 → 不会被发布到线上)
 ├── tools/
 │   ├── deploy.mjs            # 部署到 gh-pages
 │   ├── check.mjs             # 构建产物自检
 │   ├── verify-live.mjs       # 线上站点验证
 │   ├── import-wallpaper.mjs  # 从 Wallpaper Engine 导入壁纸当背景
+│   ├── import-avatar.mjs     # 从 B 站同步头像 / 网站图标
+│   ├── manage-projects.mjs   # 项目清单校验与生成
 │   └── vendor-katex.mjs      # 复制 KaTeX 运行时资源
 └── public/                   # 构建产物(不进版本库)
 ```
@@ -76,6 +80,7 @@ npm install --ignore-scripts
 | `npm run projects -- check` | 校验项目清单(揪出私有仓库) |
 | `npm run projects -- list` | 列出所有公开仓库及收录状态 |
 | `npm run projects -- add <仓库名>` | 从 GitHub 生成一条项目清单骨架 |
+| `npm run avatar -- 388480733` | 把 B 站头像同步成网站图标 |
 | `npm run new "标题"` | 新建一篇文章 |
 | `npm run vendor:katex` | 从 `node_modules/katex` 重新复制运行时资源 |
 
@@ -207,7 +212,43 @@ npm run verify      # 等 Pages 构建完(约半分钟),验证线上
 
 前两步在本地几秒就能跑完,推上去之后 GitHub Pages 构建大约需要 20~60 秒。
 
-## 增删要展示的项目
+## 把网站图标 / 头像换成 B 站头像
+
+```bash
+# 只换浏览器标签页图标
+npm run avatar -- 388480733
+
+# 顺便把站内头像(导航 + 首页那个圆形)也换掉
+npm run avatar -- 388480733 --avatar
+
+# 32px 的图标太小、细节糊成一团时,放大裁切到人物
+npm run avatar -- 388480733 --zoom 1.8 --avatar
+```
+
+参数可以是 **B 站 UID**、任意图片 URL,或本地文件路径:
+
+```bash
+npm run avatar -- https://example.com/avatar.png
+npm run avatar -- "D:\pictures\me.png"
+```
+
+工具会调 B 站的公开接口拿到头像原图,然后生成:
+
+| 文件 | 尺寸 | 用途 |
+| --- | --- | --- |
+| `favicon-32.png` | 32×32 | 浏览器标签页图标 |
+| `apple-touch-icon.png` | 180×180 | iOS 添加到主屏 |
+| `avatar.jpg` | 256×256 | 站内头像(`--avatar` 时启用) |
+
+并自动改好 `themes/cos-cross/_config.yml` 里的 `profile.avatar` / `profile.favicon` / `profile.appleTouchIcon`。
+
+**为什么要缩放**:B 站头像原图是 512×512、240 KB 的 JPEG,而标签页图标只需要 32px。不缩的话每次打开页面都要多下两百多 KB。缩放用 ffmpeg(环境变量 `FFMPEG` → PATH),没装会原样复制并给出提示。
+
+**原始文件放在 `assets/avatar-source.jpg`,故意不放进主题目录** —— 主题 `source/` 下的东西会被原样发布到线上,一张 240 KB 的原图没必要让每个访客都下。放 `assets/` 既留了底,又不会被发布。
+
+顺带修了一件事:`og:image` 原来指向 `avatar.svg`,而社交平台基本都不支持 SVG 缩略图 —— 换成 `avatar.jpg` 之后分享链接才会有正常的预览图。
+
+
 
 网站上的项目展示**只有一个数据源**:`source/_data/projects.yml`。想改就去改它,不需要动任何模板代码。
 
