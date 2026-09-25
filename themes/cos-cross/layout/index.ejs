@@ -1,13 +1,26 @@
-<%- partial('_partial/hero') %>
-
 <%
+  // 首页的全部文字都来自配置,模板里不再写死任何文案。
+  // 站点信息 → 根目录 _config.yml;其余文案 → 主题 _config.yml 的 text / hero / profile。
+  // 每处都留了默认值,所以即使 text 段没写也不会渲染出错。
+  var t = theme.text || {};
+  var fmt = function (s, vars) {
+    return String(s).replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; });
+  };
   var posts = page.posts ? page.posts.toArray() : [];
 %>
 
+<%- partial('_partial/hero') %>
+
+<% if (t.section_posts !== '') { %>
 <section class="section">
   <div class="section-head">
-    <h2 class="section-title"><span class="section-bar"></span>最新文章</h2>
-    <a class="section-more" href="<%= url_for('/archives/') %>">全部 <%= site.posts.length %> 篇 <%- partial('_partial/icon', { name: 'arrowRight', size: 14 }) %></a>
+    <h2 class="section-title"><span class="section-bar"></span><%= t.section_posts || '最新文章' %></h2>
+    <% if (t.section_posts_more !== '') { %>
+    <a class="section-more" href="<%= url_for('/archives/') %>">
+      <%= fmt(t.section_posts_more || '全部 {count} 篇', { count: site.posts.length }) %>
+      <%- partial('_partial/icon', { name: 'arrowRight', size: 14 }) %>
+    </a>
+    <% } %>
   </div>
 
   <% if (posts.length) { %>
@@ -20,19 +33,22 @@
   <% } else { %>
   <div class="empty-state">
     <span class="empty-icon" aria-hidden="true">♪</span>
-    <p class="empty-title">还没有发布文章</p>
-    <p class="empty-desc">第一篇正在路上,稍后再来看看吧。</p>
+    <p class="empty-title"><%= t.empty_posts_title || '还没有发布文章' %></p>
+    <p class="empty-desc"><%= t.empty_posts_desc || '第一篇正在路上,稍后再来看看吧。' %></p>
   </div>
   <% } %>
 </section>
+<% } %>
 
 <%- partial('_partial/home-projects') %>
 
-<% if (theme.home.show_tags && site.tags.length) { %>
+<% if (theme.home.show_tags !== false && site.tags.length && t.section_tags !== '') { %>
 <section class="section">
   <div class="section-head">
-    <h2 class="section-title"><span class="section-bar"></span>标签</h2>
-    <span class="section-hint">共 <%= site.tags.length %> 个</span>
+    <h2 class="section-title"><span class="section-bar"></span><%= t.section_tags || '标签' %></h2>
+    <% if (t.section_tags_more !== '') { %>
+    <span class="section-hint"><%= fmt(t.section_tags_more || '共 {count} 个', { count: site.tags.length }) %></span>
+    <% } %>
   </div>
   <div class="tag-cloud">
     <% site.tags.sort('length', -1).limit(20).each(function (tag) { %>

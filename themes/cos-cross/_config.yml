@@ -20,10 +20,12 @@ profile:
   favicon: '/img/favicon-32.png'
   appleTouchIcon: '/img/apple-touch-icon.png'
   bio: 高中生 · 编程 / 数学 / 音游
+  level: "LV.99"                   # 头像右下角那个小角标,留空则不显示
 
 # 首页大屏(hero)
 hero:
   greeting: "PLAYER 1"
+  status: "READY"                  # 徽章后半句,会显示成 "PLAYER 1 · READY",留空则只显示前半句
   # 标题和副标题默认取站点 _config.yml 的 title / subtitle,改了站点配置这里会自动跟着变。
   # 只有想让首页大屏显示一句不一样的话时,才打开下面两行。
   # title:
@@ -43,6 +45,36 @@ hero:
     - text: 我的项目
       link: /projects/
       primary: false
+
+# ============================================================
+#  页面固定文案
+#  首页 / 页脚上那些"不是文章内容"的字都放这里,改文案不用碰模板代码。
+#  - {count} / {days} 会被替换成实际数字
+#  - 把某一项留空(写成 '')就不显示那一块,比如 section_tags 留空 = 首页不出现标签板块
+# ============================================================
+text:
+  # ---- 首页三个板块的标题和右上角标签 ----
+  section_posts: 最新文章
+  section_posts_more: 全部 {count} 篇
+  section_projects: 项目 / 作品
+  section_projects_more: 全部项目
+  section_tags: 标签
+  section_tags_more: 共 {count} 个
+
+  # ---- 首页空状态(还没有文章时显示)----
+  empty_posts_title: 还没有发布文章
+  empty_posts_desc: 第一篇正在路上,稍后再来看看吧。
+
+  # ---- 文章卡片 ----
+  default_category: 随笔          # 文章没填 categories 时卡片上显示的兜底分类名
+
+  # ---- 页脚 ----
+  footer_days: 已经坚持了 {days} 天
+  footer_col_nav: 导航
+  footer_col_find: 找到我
+  footer_col_sub: 订阅
+  footer_sub_all: 全部文章
+  footer_combo: ALL PERFECT
 
 # 首页各板块显示条数
 home:

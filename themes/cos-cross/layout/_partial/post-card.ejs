@@ -6,6 +6,7 @@
     : truncate(strip_html(post.content || ''), { length: 96 });
   var postCats = post.categories && post.categories.length ? post.categories.toArray() : [];
   var postTags = post.tags && post.tags.length ? post.tags.toArray() : [];
+  var fallbackCat = (theme.text && theme.text.default_category) || '随笔';
 %>
 <article class="post-card reveal">
   <a class="post-card-link" href="<%= url_for(post.path) %>">
@@ -13,7 +14,7 @@
     <header class="post-card-head">
       <span class="post-card-cat">
         <%- partial('_partial/icon', { name: 'folder', size: 12 }) %>
-        <%= postCats.length ? postCats[0].name : '随笔' %>
+        <%= postCats.length ? postCats[0].name : fallbackCat %>
       </span>
       <time class="post-card-date" datetime="<%= date_xml(post.date) %>"><%= date(post.date, 'YYYY-MM-DD') %></time>
     </header>

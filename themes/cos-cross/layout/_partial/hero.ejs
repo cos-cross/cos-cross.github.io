@@ -5,6 +5,8 @@
   var heroSub = theme.hero.subtitle || config.subtitle || '';
   var heroDesc = theme.hero.desc || config.description || '';
   var siteName = theme.profile.name || config.title;
+  var level = theme.profile.level || '';
+  var chip = [theme.hero.greeting, theme.hero.status].filter(function (s) { return s; }).join(' · ');
 %>
 <section class="hero">
   <div class="hero-inner">
@@ -12,13 +14,15 @@
       <span class="avatar-ring" aria-hidden="true"></span>
       <span class="avatar-ring avatar-ring-2" aria-hidden="true"></span>
       <img src="<%= url_for(theme.profile.avatar) %>" alt="<%= siteName %>" width="128" height="128">
-      <span class="avatar-lv">LV.99</span>
+      <% if (level) { %><span class="avatar-lv"><%= level %></span><% } %>
     </div>
 
+    <% if (chip) { %>
     <div class="hero-chip reveal">
       <span class="pulse-dot" aria-hidden="true"></span>
-      <span><%= theme.hero.greeting %> · READY</span>
+      <span><%= chip %></span>
     </div>
+    <% } %>
 
     <h1 class="hero-title reveal">
       <span class="grad-text glitch" data-text="<%= heroTitle %>"><%= heroTitle %></span>

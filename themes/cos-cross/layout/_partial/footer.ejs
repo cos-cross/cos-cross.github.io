@@ -1,4 +1,5 @@
 <%
+  var t = theme.text || {};
   var siteName = theme.profile.name || config.title;
 %>
 <footer class="site-footer">
@@ -6,13 +7,20 @@
   <div class="footer-inner">
     <div class="footer-brand">
       <div class="footer-mark"><span class="grad-text"><%= siteName %></span></div>
-      <p class="footer-slogan"><%= theme.footer.slogan %></p>
-      <p class="footer-days">已经坚持了 <b id="site-days">—</b> 天</p>
+      <% if (theme.footer.slogan) { %><p class="footer-slogan"><%= theme.footer.slogan %></p><% } %>
+      <%
+        // 天数由 main.js 填进 #site-days,文案里的 {days} 用来标记那个 <b> 的位置
+        var daysText = t.footer_days === undefined ? '已经坚持了 {days} 天' : t.footer_days;
+        var daysParts = String(daysText).split('{days}');
+      %>
+      <% if (daysText !== '') { %>
+      <p class="footer-days"><%= daysParts[0] %><b id="site-days">—</b><%= daysParts[1] || '' %></p>
+      <% } %>
     </div>
 
     <div class="footer-cols">
       <div class="footer-col">
-        <h4>导航</h4>
+        <h4><%= t.footer_col_nav || '导航' %></h4>
         <ul>
           <% Object.keys(theme.menu).forEach(function (name) { %>
           <li><a href="<%= url_for(theme.menu[name]) %>"><%= name %></a></li>
@@ -20,7 +28,7 @@
         </ul>
       </div>
       <div class="footer-col">
-        <h4>找到我</h4>
+        <h4><%= t.footer_col_find || '找到我' %></h4>
         <ul>
           <% (theme.social || []).forEach(function (item) { %>
           <li>
@@ -32,10 +40,10 @@
         </ul>
       </div>
       <div class="footer-col">
-        <h4>订阅</h4>
+        <h4><%= t.footer_col_sub || '订阅' %></h4>
         <ul>
           <li><a href="<%= url_for('/atom.xml') %>"><%- partial('_partial/icon', { name: 'rss', size: 14 }) %>RSS / Atom</a></li>
-          <li><a href="<%= url_for('/archives/') %>"><%- partial('_partial/icon', { name: 'folder', size: 14 }) %>全部文章</a></li>
+          <li><a href="<%= url_for('/archives/') %>"><%- partial('_partial/icon', { name: 'folder', size: 14 }) %><%= t.footer_sub_all || '全部文章' %></a></li>
         </ul>
       </div>
     </div>
@@ -43,10 +51,12 @@
 
   <div class="footer-bottom">
     <span>© <%= theme.footer.since %>–<%= date(new Date(), 'YYYY') %> <%= siteName %></span>
+    <% if (t.footer_combo !== '') { %>
     <span class="footer-sep">·</span>
     <span>Powered by <a href="https://hexo.io" target="_blank" rel="noopener noreferrer">Hexo</a> &amp; GitHub Pages</span>
     <span class="footer-sep">·</span>
-    <span class="footer-combo">ALL PERFECT <span class="combo-dot"></span></span>
+    <span class="footer-combo"><%= t.footer_combo || 'ALL PERFECT' %> <span class="combo-dot"></span></span>
+    <% } %>
   </div>
   <span class="footer-since-hidden" id="site-since" data-since="<%= theme.footer.since %>-01-01" hidden></span>
 </footer>

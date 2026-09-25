@@ -1,15 +1,18 @@
 <%
+  var t = theme.text || {};
   // hidden: true 的项目在所有位置都不展示(数据仍留在 projects.yml 里)
   var all = ((site.data && site.data.projects) ? site.data.projects : [])
     .filter(function (item) { return !item.hidden; });
   var limit = (theme.home && theme.home.projects) ? theme.home.projects : 3;
   var shown = all.slice(0, limit);
 %>
-<% if (shown.length) { %>
+<% if (shown.length && t.section_projects !== '') { %>
 <section class="section">
   <div class="section-head">
-    <h2 class="section-title"><span class="section-bar"></span>项目 / 作品</h2>
-    <a class="section-more" href="<%= url_for('/projects/') %>">全部项目 <%- partial('_partial/icon', { name: 'arrowRight', size: 14 }) %></a>
+    <h2 class="section-title"><span class="section-bar"></span><%= t.section_projects || '项目 / 作品' %></h2>
+    <% if (t.section_projects_more !== '') { %>
+    <a class="section-more" href="<%= url_for('/projects/') %>"><%= t.section_projects_more || '全部项目' %> <%- partial('_partial/icon', { name: 'arrowRight', size: 14 }) %></a>
+    <% } %>
   </div>
 
   <div class="project-grid">

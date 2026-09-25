@@ -393,6 +393,59 @@ GITHUB_TOKEN=ghp_xxx npm run deploy
 2. 构建报错的话,`npm run check` 能在本地提前发现大部分问题(死链、模板残留、关键结构缺失);
 3. 产物确实推上去了但线上没变 → 大概率是浏览器缓存,`Ctrl+Shift+R` 强刷。
 
+## 主页上的字都在哪改
+
+首页所有文字都来自配置,**不需要动模板**。三个地方:
+
+| 页面上看到的位置 | 改哪里 |
+| --- | --- |
+| 浏览器标签页 | `_config.yml` → `title` / `subtitle` |
+| 导航栏品牌名 | `_config.yml` → `title`(或主题配置 `profile.name` 覆盖) |
+| 导航栏头像下面的小字 | 主题配置 → `profile.bio` |
+| 导航菜单项(首页/文章/项目/关于) | 主题配置 → `menu` |
+| 头像右下角小角标(`LV.99`) | 主题配置 → `profile.level`(留空则不显示) |
+| 大屏徽章(`PLAYER 1 · READY`) | 主题配置 → `hero.greeting` + `hero.status` |
+| 大屏大标题 | `_config.yml` → `title`(或主题配置 `hero.title` 覆盖) |
+| 大屏副标题 | `_config.yml` → `subtitle`(或主题配置 `hero.subtitle` 覆盖) |
+| 大屏标语 | 主题配置 → `hero.desc`(留空则用 `_config.yml` 的 `description`) |
+| 两个按钮的文字和链接 | 主题配置 → `hero.buttons` |
+| 技能标签(JavaScript / Python / …) | 主题配置 → `hero.tags` |
+| 板块标题「最新文章」「项目 / 作品」「标签」 | 主题配置 → `text.section_posts` / `section_projects` / `section_tags` |
+| 板块右上角「全部 N 篇」「全部项目」 | 主题配置 → `text.section_posts_more` / `section_projects_more` |
+| 没有文章时的提示 | 主题配置 → `text.empty_posts_title` / `empty_posts_desc` |
+| 文章卡片内容 | 文章自己的 front-matter;项目卡片来自 `source/_data/projects.yml` |
+| 页脚标语 | 主题配置 → `footer.slogan` |
+| 页脚「已经坚持了 N 天」 | 主题配置 → `text.footer_days` |
+| 页脚三列标题(导航/找到我/订阅) | 主题配置 → `text.footer_col_nav` / `footer_col_find` / `footer_col_sub` |
+| 页脚右下角彩蛋 `ALL PERFECT` | 主题配置 → `text.footer_combo`(留空则整块隐藏) |
+
+三个好用的点:
+
+**1. `{count}` / `{days}` 会被自动替换成实际数字。**
+
+```yaml
+text:
+  section_posts_more: 全部 {count} 篇      # → 全部 12 篇
+  footer_days: 已经坚持了 {days} 天        # → 已经坚持了 260 天
+```
+
+**2. 留空 = 隐藏那一块**,不用去删模板代码:
+
+```yaml
+text:
+  section_tags: ''        # 首页不再出现标签板块
+  footer_combo: ''        # 页脚彩蛋整块消失
+```
+
+**3. 改完先本地看效果,满意了再发:**
+
+```bash
+npm run server          # http://localhost:4000,改配置自动刷新
+npm run deploy          # 满意了再发布
+```
+
+YAML 缩进写错会导致整段配置失效,`npm run server` / `npm run build` 启动时会打印 `Validating config` 相关的报错 —— 改完先跑一下。
+
 ## 自定义
 
 **站名和副标题只有一处来源:`_config.yml` 的 `title` / `subtitle`。** 改完这几处会自动跟着变 —— 浏览器标签页、导航栏品牌名、首页大屏标题、页脚品牌名和版权行,全部一致。
