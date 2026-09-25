@@ -393,6 +393,23 @@
     return quads;
   }
 
+  /**
+   * 拖拽 → 相机角度。抽成纯函数是为了能单测 ——
+   * "拖右时物体该往哪边转"这种事只有写成可验证的规则才不会被改错。
+   *
+   * 手感约定:**物体跟着鼠标走**(抓住正面拖动的那种感觉),而不是相机反向绕行。
+   * 投影里 x_screen = w/2 + r.x·k·s,而 az 增大时正面的点 (0,0,1) 的 r.x = sin(az) 增大,
+   * 所以"拖右 → az 增大"。竖直方向同理:往下拖 → 正面往下翻、露出顶部 → el 增大。
+   */
+  var ORBIT_SENS = 0.008;
+
+  function applyOrbit(cam, dx, dy) {
+    return {
+      az: cam.az + dx * ORBIT_SENS,
+      el: Math.max(-1.5, Math.min(1.5, cam.el + dy * ORBIT_SENS)),
+    };
+  }
+
   /* ============================================================
      五、配色
      ============================================================ */
@@ -798,8 +815,9 @@
       lastX = e.clientX; lastY = e.clientY;
 
       if (kind === '3d') {
-        state.cam.az -= dx * 0.008;
-        state.cam.el = Math.max(-1.5, Math.min(1.5, state.cam.el + dy * 0.008));
+        var next = applyOrbit(state.cam, dx, dy);
+        state.cam.az = next.az;
+        state.cam.el = next.el;
       } else {
         var v = state.view;
         var sx = (v.x1 - v.x0) / size.w;
@@ -900,6 +918,7 @@
     compute2D: compute2D,
     buildSurface: buildSurface,
     buildQuads: buildQuads,
+    applyOrbit: applyOrbit,
     project: project,
     rotatePoint: rotatePoint,
     colormap: colormap,
