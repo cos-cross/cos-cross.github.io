@@ -1,0 +1,17 @@
+# ---- Hexo ----
+node_modules/
+public/
+db.json
+.deploy_git/
+.deploy/
+*.log
+
+# ---- 部署脚本用的临时检出 ----
+.gh-pages-worktree/
+
+# ---- 编辑器 / 系统 ----
+.DS_Store
+Thumbs.db
+*.swp
+
+# 注意:_config.yml 里的敏感值(如令牌)永远不要写进仓库

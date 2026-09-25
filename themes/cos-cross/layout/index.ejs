@@ -1,0 +1,41 @@
+<%- partial('_partial/hero') %>
+
+<%
+  var posts = page.posts ? page.posts.toArray() : [];
+%>
+
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title"><span class="section-bar"></span>最新文章</h2>
+    <a class="section-more" href="<%= url_for('/archives/') %>">全部 <%= site.posts.length %> 篇 <%- partial('_partial/icon', { name: 'arrowRight', size: 14 }) %></a>
+  </div>
+
+  <% if (posts.length) { %>
+  <div class="post-grid">
+    <% posts.forEach(function (post) { %>
+    <%- partial('_partial/post-card', { post: post }) %>
+    <% }); %>
+  </div>
+  <%- partial('_partial/pager') %>
+  <% } else { %>
+  <p class="empty-tip">还没有文章,去 <code>source/_posts/</code> 里写下第一篇吧。</p>
+  <% } %>
+</section>
+
+<%- partial('_partial/home-projects') %>
+
+<% if (theme.home.show_tags && site.tags.length) { %>
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title"><span class="section-bar"></span>标签</h2>
+    <span class="section-hint">共 <%= site.tags.length %> 个</span>
+  </div>
+  <div class="tag-cloud">
+    <% site.tags.sort('length', -1).limit(20).each(function (tag) { %>
+    <a class="tag-pill" href="<%= url_for(tag.path) %>">
+      <span class="tag-hash">#</span><%= tag.name %><span class="tag-count"><%= tag.length %></span>
+    </a>
+    <% }); %>
+  </div>
+</section>
+<% } %>

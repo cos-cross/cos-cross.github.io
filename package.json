@@ -1,0 +1,31 @@
+{
+  "name": "cos-cross-blog",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cos-Cross 的个人博客 —— 编程 / 数学 / 音游",
+  "scripts": {
+    "clean": "hexo clean",
+    "build": "hexo generate",
+    "server": "hexo server",
+    "new": "hexo new",
+    "deploy": "hexo generate && node tools/deploy.mjs",
+    "check": "hexo generate && node tools/check.mjs",
+    "vendor:katex": "node tools/vendor-katex.mjs"
+  },
+  "hexo": {
+    "version": "8.1.2"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "hexo": "^8.1.2",
+    "hexo-generator-archive": "^2.0.0",
+    "hexo-generator-category": "^2.0.0",
+    "hexo-generator-feed": "^4.0.0",
+    "hexo-generator-index": "^4.0.0",
+    "hexo-generator-tag": "^2.0.0",
+    "hexo-renderer-ejs": "^2.0.0",
+    "hexo-renderer-marked": "^7.0.1",
+    "hexo-server": "^3.0.0",
+    "katex": "^0.18.9"
+  }
+}

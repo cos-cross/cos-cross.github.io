@@ -1,0 +1,48 @@
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-avatar reveal">
+      <span class="avatar-ring" aria-hidden="true"></span>
+      <span class="avatar-ring avatar-ring-2" aria-hidden="true"></span>
+      <img src="<%= url_for(theme.profile.avatar) %>" alt="<%= theme.profile.name %>" width="128" height="128">
+      <span class="avatar-lv">LV.99</span>
+    </div>
+
+    <div class="hero-chip reveal">
+      <span class="pulse-dot" aria-hidden="true"></span>
+      <span><%= theme.hero.greeting %> · READY</span>
+    </div>
+
+    <h1 class="hero-title reveal">
+      <span class="grad-text glitch" data-text="<%= theme.hero.title %>"><%= theme.hero.title %></span>
+    </h1>
+
+    <p class="hero-sub reveal"><%= theme.hero.subtitle %></p>
+    <p class="hero-desc reveal"><%= theme.hero.desc %></p>
+
+    <div class="hero-actions reveal">
+      <% (theme.hero.buttons || []).forEach(function (btn) { %>
+      <a class="btn <%= btn.primary ? 'btn-primary' : 'btn-ghost' %>" href="<%= url_for(btn.link) %>">
+        <span><%= btn.text %></span>
+        <%- partial('_partial/icon', { name: 'arrowRight', size: 16 }) %>
+      </a>
+      <% }); %>
+    </div>
+
+    <div class="hero-tags reveal">
+      <% (theme.hero.tags || []).forEach(function (tag) { %>
+      <span class="chip"><span class="chip-dot"></span><%= tag %></span>
+      <% }); %>
+    </div>
+  </div>
+
+  <div class="hero-lane" aria-hidden="true">
+    <div class="lane-track">
+      <% for (var i = 0; i < 9; i++) { %>
+      <span class="lane-note" style="--x: <%= 6 + i * 11 %>%; --delay: <%= (i * 0.37).toFixed(2) %>s; --dur: <%= (2.4 + (i % 4) * 0.45).toFixed(2) %>s;"></span>
+      <% } %>
+    </div>
+    <div class="judge-line">
+      <span class="judge-label">PERFECT</span>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,34 @@
+<%
+  var projects = (site.data && site.data.projects) ? site.data.projects : [];
+  var limit = (theme.home && theme.home.projects) ? theme.home.projects : 3;
+  var shown = projects.slice(0, limit);
+%>
+<% if (shown.length) { %>
+<section class="section">
+  <div class="section-head">
+    <h2 class="section-title"><span class="section-bar"></span>项目 / 作品</h2>
+    <a class="section-more" href="<%= url_for('/projects/') %>">全部项目 <%- partial('_partial/icon', { name: 'arrowRight', size: 14 }) %></a>
+  </div>
+
+  <div class="project-grid">
+    <% shown.forEach(function (item) { %>
+    <article class="project-card reveal accent-<%= item.accent || 'cyan' %>">
+      <a class="project-card-link" href="<%= item.link || item.repo || '#' %>" target="_blank" rel="noopener noreferrer">
+        <header class="project-head">
+          <span class="project-icon"><%- partial('_partial/icon', { name: item.icon || 'code', size: 18 }) %></span>
+          <span class="project-lang"><%= item.lang || 'Code' %></span>
+        </header>
+        <h3 class="project-name"><%= item.name %></h3>
+        <p class="project-desc"><%= item.desc %></p>
+        <footer class="project-foot">
+          <span class="project-tags">
+            <% (item.tags || []).slice(0, 3).forEach(function (t) { %><span class="mini-tag"><%= t %></span><% }); %>
+          </span>
+          <span class="project-go"><%- partial('_partial/icon', { name: 'external', size: 14 }) %></span>
+        </footer>
+      </a>
+    </article>
+    <% }); %>
+  </div>
+</section>
+<% } %>

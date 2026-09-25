@@ -1,0 +1,57 @@
+<%
+  var projects = (site.data && site.data.projects) ? site.data.projects : [];
+  var groupOrder = [];
+  var groups = {};
+  projects.forEach(function (item) {
+    var g = item.group || '项目';
+    if (!groups[g]) { groups[g] = []; groupOrder.push(g); }
+    groups[g].push(item);
+  });
+%>
+
+<section class="page-hero">
+  <p class="page-kicker">PROJECTS</p>
+  <h1 class="page-title grad-text"><%= page.title || '项目' %></h1>
+  <p class="page-sub"><%= page.subtitle || ('一共 ' + projects.length + ' 个,持续更新中') %></p>
+</section>
+
+<div class="page-content page-intro">
+  <%- page.content %>
+</div>
+
+<% groupOrder.forEach(function (groupName) { %>
+<section class="section section-flush">
+  <div class="section-head">
+    <h2 class="section-title"><span class="section-bar"></span><%= groupName %></h2>
+    <span class="section-hint"><%= groups[groupName].length %> 个</span>
+  </div>
+
+  <div class="project-grid">
+    <% groups[groupName].forEach(function (item) { %>
+    <article class="project-card reveal accent-<%= item.accent || 'cyan' %>">
+      <a class="project-card-link" href="<%= item.link || item.repo || '#' %>" target="_blank" rel="noopener noreferrer">
+        <header class="project-head">
+          <span class="project-icon"><%- partial('_partial/icon', { name: item.icon || 'code', size: 18 }) %></span>
+          <span class="project-lang"><%= item.lang || 'Code' %></span>
+        </header>
+        <h3 class="project-name"><%= item.name %></h3>
+        <p class="project-desc"><%= item.desc %></p>
+        <footer class="project-foot">
+          <span class="project-tags">
+            <% (item.tags || []).forEach(function (t) { %><span class="mini-tag"><%= t %></span><% }); %>
+          </span>
+          <span class="project-go"><%- partial('_partial/icon', { name: 'external', size: 14 }) %></span>
+        </footer>
+        <% if (item.repo && item.link) { %>
+        <span class="project-repo-hint">源码见 GitHub</span>
+        <% } %>
+      </a>
+    </article>
+    <% }); %>
+  </div>
+</section>
+<% }); %>
+
+<% if (!projects.length) { %>
+<p class="empty-tip">还没有配置项目,编辑 <code>source/_data/projects.yml</code> 即可添加。</p>
+<% } %>

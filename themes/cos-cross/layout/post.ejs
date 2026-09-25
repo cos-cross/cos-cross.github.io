@@ -1,0 +1,96 @@
+<%
+  var plain = strip_html(page.content || '').replace(/\s+/g, '');
+  var readMin = Math.max(1, Math.ceil(plain.length / 350));
+  var cats = (page.categories && page.categories.length) ? page.categories.toArray() : [];
+  var tags = (page.tags && page.tags.length) ? page.tags.toArray() : [];
+  var tocHtml = theme.post.toc ? toc(page.content, { list_number: false, max_depth: 3 }) : '';
+  var hasToc = !!(tocHtml && String(tocHtml).trim());
+  var updatedDiff = page.updated && (page.updated.valueOf() - page.date.valueOf() > 60000);
+%>
+
+<article class="post">
+  <header class="post-header">
+    <nav class="post-crumbs" aria-label="面包屑">
+      <a href="<%= url_for('/') %>">首页</a>
+      <span>/</span>
+      <a href="<%= url_for('/archives/') %>">文章</a>
+      <% if (cats.length) { %><span>/</span><span class="crumb-cat"><%= cats[0].name %></span><% } %>
+    </nav>
+
+    <h1 class="post-title"><%= page.title %></h1>
+
+    <div class="post-meta">
+      <span class="meta-item"><%- partial('_partial/icon', { name: 'calendar', size: 14 }) %><time datetime="<%= date_xml(page.date) %>"><%= date(page.date, 'YYYY-MM-DD') %></time></span>
+      <% if (theme.post.reading_time) { %>
+      <span class="meta-item"><%- partial('_partial/icon', { name: 'clock', size: 14 }) %>约 <%= readMin %> 分钟</span>
+      <% } %>
+      <% if (theme.post.updated && updatedDiff) { %>
+      <span class="meta-item meta-updated"><%- partial('_partial/icon', { name: 'star', size: 14 }) %>更新于 <%= date(page.updated, 'YYYY-MM-DD') %></span>
+      <% } %>
+      <% if (cats.length) { %>
+      <span class="meta-item"><%- partial('_partial/icon', { name: 'folder', size: 14 }) %><%= cats.map(function (c) { return c.name; }).join(' / ') %></span>
+      <% } %>
+    </div>
+
+    <% if (tags.length) { %>
+    <div class="post-tags">
+      <% tags.forEach(function (tag) { %>
+      <a class="tag-pill" href="<%= url_for(tag.path) %>"><span class="tag-hash">#</span><%= tag.name %></a>
+      <% }); %>
+    </div>
+    <% } %>
+  </header>
+
+  <div class="post-layout<%= hasToc ? ' with-toc' : '' %>">
+    <% if (hasToc) { %>
+    <aside class="post-toc" id="post-toc" aria-label="目录">
+      <div class="toc-card">
+        <div class="toc-title"><span class="toc-bar"></span>目录</div>
+        <%- tocHtml %>
+        <div class="toc-progress"><span class="toc-progress-bar" id="toc-progress-bar"></span></div>
+      </div>
+    </aside>
+    <% } %>
+
+    <div class="post-main">
+      <div class="post-content" id="post-content">
+        <%- page.content %>
+      </div>
+
+      <footer class="post-footer">
+        <div class="post-end">
+          <span class="post-end-line"></span>
+          <span class="post-end-text">CLEARED</span>
+          <span class="post-end-line"></span>
+        </div>
+
+        <% if (theme.post.prev_next && (page.prev || page.next)) { %>
+        <nav class="post-nav" aria-label="上下篇">
+          <% if (page.prev) { %>
+          <a class="post-nav-item prev" href="<%= url_for(page.prev.path) %>">
+            <span class="post-nav-label"><%- partial('_partial/icon', { name: 'arrowLeft', size: 14 }) %>上一篇</span>
+            <span class="post-nav-title"><%= page.prev.title %></span>
+          </a>
+          <% } else { %><span class="post-nav-item is-empty"></span><% } %>
+          <% if (page.next) { %>
+          <a class="post-nav-item next" href="<%= url_for(page.next.path) %>">
+            <span class="post-nav-label">下一篇<%- partial('_partial/icon', { name: 'arrowRight', size: 14 }) %></span>
+            <span class="post-nav-title"><%= page.next.title %></span>
+          </a>
+          <% } else { %><span class="post-nav-item is-empty"></span><% } %>
+        </nav>
+        <% } %>
+
+        <div class="post-actions">
+          <a class="btn btn-ghost btn-sm" href="<%= url_for('/archives/') %>"><%- partial('_partial/icon', { name: 'folder', size: 15 }) %>返回文章列表</a>
+          <button class="btn btn-ghost btn-sm" id="share-btn" type="button" data-title="<%= page.title %>"><%- partial('_partial/icon', { name: 'link', size: 15 }) %>复制链接</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+</article>
+
+<% if (page.math) { %>
+<script defer src="<%= url_for('/vendor/katex/katex.min.js') %>"></script>
+<script defer src="<%= url_for('/vendor/katex/auto-render.min.js') %>"></script>
+<% } %>

@@ -1,0 +1,119 @@
+# ============================================================
+#  Hexo 站点配置 —— Cos-Cross 的个人博客
+#  改完执行 `npm run build`,再把产物推到 gh-pages 即可发布。
+# ============================================================
+
+# ---------- 站点信息 ----------
+title: Cos-Cross
+subtitle: 编程 · 数学 · 音游
+description: Cos-Cross 的个人博客 —— 一个热爱编程、数学与音游的高中生,在这里记录代码、公式和谱面。
+keywords: Cos-Cross,个人博客,编程,数学,音游,JavaScript,Python,OI,前端
+author: Cos-Cross
+language: zh-CN
+timezone: Asia/Shanghai
+
+# ---------- 网址 ----------
+url: https://cos-cross.github.io
+root: /
+permalink: posts/:title/
+permalink_defaults:
+pretty_urls:
+  trailing_index: false
+  trailing_html: false
+
+# ---------- 目录 ----------
+source_dir: source
+public_dir: public
+tag_dir: tags
+archive_dir: archives
+category_dir: categories
+code_dir: downloads/code
+i18n_dir: :lang
+skip_render:
+
+# ---------- 文章 ----------
+new_post_name: :title.md
+default_layout: post
+titlecase: false
+external_link:
+  enable: true
+  field: site
+  exclude: ''
+filename_case: 0
+render_drafts: false
+post_asset_folder: false
+relative_link: false
+future: true
+
+# ---------- 高亮 ----------
+highlight:
+  enable: true
+  line_number: true
+  auto_detect: false
+  tab_replace: '  '
+  wrap: true
+  hljs: false
+prismjs:
+  enable: false
+  preprocess: true
+  line_number: true
+  tab_replace: ''
+
+# ---------- 首页 / 归档分页 ----------
+index_generator:
+  path: ''
+  per_page: 6
+  order_by: -date
+
+per_page: 10
+pagination_dir: page
+
+archive_generator:
+  enabled: true
+  per_page: 30
+  yearly: true
+  monthly: false
+  daily: false
+  order_by: -date
+
+category_generator:
+  enabled: true
+  per_page: 12
+
+tag_generator:
+  enabled: true
+  per_page: 24
+
+# ---------- 分类 / 标签默认值 ----------
+default_category: 随笔
+category_map:
+tag_map:
+
+# ---------- 日期格式 ----------
+date_format: YYYY-MM-DD
+time_format: HH:mm:ss
+updated_option: mtime
+
+# ---------- RSS ----------
+feed:
+  type: atom
+  path: atom.xml
+  limit: 20
+  hub:
+  content: true
+  content_limit: 140
+  content_limit_delim: ' '
+
+# ---------- 本地预览 ----------
+server:
+  port: 4000
+  compress: true
+  header: true
+  cache: false
+
+# ---------- 主题 ----------
+theme: cos-cross
+
+# 注意:本项目用 scripts/deploy.mjs 把 public/ 推到 gh-pages 分支,
+# 所以这里不配置 hexo-deployer-git,避免把令牌写进配置文件。
+deploy: {}

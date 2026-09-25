@@ -1,0 +1,75 @@
+# ============================================================
+#  Cos-Cross 博客主题配置(二次元音游风)
+#  改完直接 `npm run build` 即可,不需要动模板代码。
+# ============================================================
+
+# 顶部导航(顺序即显示顺序,想隐藏某一项就删掉那一行)
+menu:
+  首页: /
+  文章: /archives/
+  项目: /projects/
+  关于: /about/
+
+# 站点主人信息
+profile:
+  name: Cos-Cross
+  handle: "@Cos_Cross"
+  avatar: /img/avatar.svg
+  bio: 高中生 · 编程 / 数学 / 音游
+
+# 首页大屏(hero)
+hero:
+  greeting: "PLAYER 1"
+  title: "Cos-Cross"
+  subtitle: "编程 · 数学 · 音游"
+  desc: "把灵感写成代码,把热爱打成 PERFECT。"
+  tags:
+    - JavaScript
+    - Python
+    - OI
+    - Math
+    - Music Game
+  buttons:
+    - text: 开始阅读
+      link: /archives/
+      primary: true
+    - text: 我的项目
+      link: /projects/
+      primary: false
+
+# 首页各板块显示条数
+home:
+  posts: 6
+  projects: 3
+  show_tags: true
+
+# 社交链接(icon 可选:github / bilibili / mail / link)
+social:
+  - name: GitHub
+    icon: github
+    link: https://github.com/cos-cross
+  - name: Bilibili
+    icon: bilibili
+    link: https://space.bilibili.com/388480733
+  - name: 邮箱
+    icon: mail
+    link: mailto:coscross@126.com
+
+# 文章页
+post:
+  toc: true            # 显示目录
+  reading_time: true   # 显示预计阅读时间
+  prev_next: true      # 上一篇 / 下一篇
+  updated: true        # 显示最后更新时间
+
+# 页脚
+footer:
+  since: 2025
+  slogan: "Made with Hexo · Hosted on GitHub Pages"
+
+# 动效开关(觉得太花可以把它们关掉)
+effects:
+  aurora: true      # 背景极光光晕
+  particles: true   # 飘浮音符粒子
+  combo: true       # 右下角连击 HUD
+  reveal: true      # 滚动淡入

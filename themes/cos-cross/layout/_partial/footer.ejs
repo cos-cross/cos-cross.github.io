@@ -1,0 +1,49 @@
+<footer class="site-footer">
+  <div class="footer-glow" aria-hidden="true"></div>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="footer-mark"><span class="grad-text"><%= theme.profile.name %></span></div>
+      <p class="footer-slogan"><%= theme.footer.slogan %></p>
+      <p class="footer-days">已经坚持了 <b id="site-days">—</b> 天</p>
+    </div>
+
+    <div class="footer-cols">
+      <div class="footer-col">
+        <h4>导航</h4>
+        <ul>
+          <% Object.keys(theme.menu).forEach(function (name) { %>
+          <li><a href="<%= url_for(theme.menu[name]) %>"><%= name %></a></li>
+          <% }); %>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>找到我</h4>
+        <ul>
+          <% (theme.social || []).forEach(function (item) { %>
+          <li>
+            <a href="<%= item.link %>" target="_blank" rel="noopener noreferrer">
+              <%- partial('_partial/icon', { name: item.icon, size: 14 }) %><%= item.name %>
+            </a>
+          </li>
+          <% }); %>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>订阅</h4>
+        <ul>
+          <li><a href="<%= url_for('/atom.xml') %>"><%- partial('_partial/icon', { name: 'rss', size: 14 }) %>RSS / Atom</a></li>
+          <li><a href="<%= url_for('/archives/') %>"><%- partial('_partial/icon', { name: 'folder', size: 14 }) %>全部文章</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    <span>© <%= theme.footer.since %>–<%= date(new Date(), 'YYYY') %> <%= theme.profile.name %></span>
+    <span class="footer-sep">·</span>
+    <span>Powered by <a href="https://hexo.io" target="_blank" rel="noopener noreferrer">Hexo</a> &amp; GitHub Pages</span>
+    <span class="footer-sep">·</span>
+    <span class="footer-combo">ALL PERFECT <span class="combo-dot"></span></span>
+  </div>
+  <span class="footer-since-hidden" id="site-since" data-since="<%= theme.footer.since %>-01-01" hidden></span>
+</footer>

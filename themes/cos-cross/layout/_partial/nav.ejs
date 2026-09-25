@@ -1,0 +1,46 @@
+<%
+  var currentPath = url_for(page.path || '/');
+%>
+<header class="site-nav" id="site-nav">
+  <div class="nav-inner">
+    <a class="brand" href="<%= url_for('/') %>">
+      <span class="brand-avatar-wrap">
+        <img class="brand-avatar" src="<%= url_for(theme.profile.avatar) %>" alt="<%= theme.profile.name %>" width="38" height="38">
+      </span>
+      <span class="brand-text">
+        <strong><%= theme.profile.name %></strong>
+        <em><%= theme.profile.bio %></em>
+      </span>
+    </a>
+
+    <nav class="nav-menu" id="nav-menu" aria-label="主导航">
+      <% Object.keys(theme.menu).forEach(function (name) { %>
+      <%
+        var link = theme.menu[name];
+        var linkUrl = url_for(link);
+        var active = (link === '/' || link === '')
+          ? is_home()
+          : currentPath.indexOf(linkUrl) === 0;
+      %>
+      <a class="nav-link<%= active ? ' is-active' : '' %>" href="<%= linkUrl %>">
+        <span><%= name %></span>
+      </a>
+      <% }); %>
+      <div class="nav-menu-foot">
+        <% (theme.social || []).forEach(function (item) { %>
+        <a class="nav-social" href="<%= item.link %>" target="_blank" rel="noopener noreferrer"><%= item.name %></a>
+        <% }); %>
+      </div>
+    </nav>
+
+    <div class="nav-actions">
+      <button class="icon-btn" id="theme-toggle" type="button" aria-label="切换深浅色">
+        <svg class="ico-moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.8 6.8 0 0 0 9.8 9.8z" fill="currentColor"/></svg>
+        <svg class="ico-sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2.5a1 1 0 0 1 1 1V22a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zm0-20a1 1 0 0 1 1 1V2a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zM3.5 12a1 1 0 0 1 1-1H6a1 1 0 1 1 0 2H4.5a1 1 0 0 1-1-1zm14.5 0a1 1 0 0 1 1-1h1.5a1 1 0 1 1 0 2H19a1 1 0 0 1-1-1zM5.3 5.3a1 1 0 0 1 1.4 0l1 1a1 1 0 1 1-1.4 1.4l-1-1a1 1 0 0 1 0-1.4zm11 11a1 1 0 0 1 1.4 0l1 1a1 1 0 0 1-1.4 1.4l-1-1a1 1 0 0 1 0-1.4zm1.4-11a1 1 0 0 1 0 1.4l-1 1a1 1 0 1 1-1.4-1.4l1-1a1 1 0 0 1 1.4 0zm-11 11a1 1 0 0 1 0 1.4l-1 1a1 1 0 0 1-1.4-1.4l1-1a1 1 0 0 1 1.4 0z" fill="currentColor"/></svg>
+      </button>
+      <button class="icon-btn nav-burger" id="nav-burger" type="button" aria-label="菜单" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>

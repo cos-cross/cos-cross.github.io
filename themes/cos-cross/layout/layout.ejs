@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<%- partial('_partial/head') %>
+<body class="page-<%= is_home() ? 'home' : (is_post() ? 'post' : (is_archive() ? 'archive' : 'page')) %>">
+
+  <% if (theme.effects && theme.effects.aurora !== false) { %>
+  <div class="bg-fx" aria-hidden="true">
+    <span class="orb orb-1"></span>
+    <span class="orb orb-2"></span>
+    <span class="orb orb-3"></span>
+    <span class="grid-lines"></span>
+    <span class="scanline"></span>
+  </div>
+  <% } %>
+  <% if (theme.effects && theme.effects.particles !== false) { %>
+  <canvas id="note-canvas" class="note-canvas" aria-hidden="true"></canvas>
+  <% } %>
+
+  <div class="reading-progress" id="reading-progress" aria-hidden="true"></div>
+
+  <%- partial('_partial/nav') %>
+
+  <main class="site-main">
+    <%- body %>
+  </main>
+
+  <%- partial('_partial/footer') %>
+
+  <% if (theme.effects && theme.effects.combo !== false) { %>
+  <div class="combo-hud" id="combo-hud" aria-hidden="true">
+    <span class="combo-label">COMBO</span>
+    <span class="combo-num" id="combo-num">0</span>
+    <span class="combo-judge" id="combo-judge"></span>
+  </div>
+  <% } %>
+
+  <button class="to-top" id="to-top" type="button" aria-label="回到顶部">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5l7 7-1.4 1.4L13 8.8V19h-2V8.8L6.4 13.4 5 12z" fill="currentColor"/></svg>
+  </button>
+
+  <script src="<%- url_for('/js/main.js') %>"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<%
+  var pageTitle = is_home()
+    ? (config.title + (config.subtitle ? ' · ' + config.subtitle : ''))
+    : (page.title ? page.title + ' | ' + config.title : config.title);
+  var rawDesc = page.excerpt ? page.excerpt : (page.description || (is_home() ? config.description : ''));
+  var pageDesc = rawDesc ? truncate(strip_html(rawDesc), 140) : (config.description || '');
+  var canonical = full_url_for(page.path || '/');
+  var avatarUrl = full_url_for(theme.profile.avatar);
+%>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title><%= pageTitle %></title>
+  <meta name="description" content="<%= pageDesc %>">
+  <% if (config.keywords) { %><meta name="keywords" content="<%= config.keywords %>"><% } %>
+  <meta name="author" content="<%= config.author %>">
+  <meta name="theme-color" content="#07070f">
+  <link rel="canonical" href="<%= canonical %>">
+
+  <meta property="og:type" content="<%= is_post() ? 'article' : 'website' %>">
+  <meta property="og:title" content="<%= pageTitle %>">
+  <meta property="og:description" content="<%= pageDesc %>">
+  <meta property="og:url" content="<%= canonical %>">
+  <meta property="og:site_name" content="<%= config.title %>">
+  <meta property="og:image" content="<%= avatarUrl %>">
+  <meta name="twitter:card" content="summary">
+
+  <link rel="icon" href="<%= url_for('/img/favicon.svg') %>" type="image/svg+xml">
+  <link rel="alternate" type="application/atom+xml" title="<%= config.title %>" href="<%= url_for('/atom.xml') %>">
+  <link rel="stylesheet" href="<%= url_for('/css/style.css') %>">
+  <% if (page.math) { %>
+  <link rel="stylesheet" href="<%= url_for('/vendor/katex/katex.min.css') %>">
+  <% } %>
+</head>

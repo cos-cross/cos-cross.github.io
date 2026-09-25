@@ -1,0 +1,95 @@
+# ============================================================
+#  项目 / 作品清单
+#  首页只显示前 N 个(在主题 _config.yml 的 home.projects 里改),
+#  /projects/ 页面会按 group 分组显示全部。
+#  字段说明:
+#    name    项目名
+#    desc    一句话介绍
+#    lang    主要语言(显示在右上角)
+#    link    在线体验地址(有 Pages 的项目才有)
+#    repo    GitHub 仓库地址
+#    tags    标签数组
+#    icon    图标: code / star / music / link
+#    accent  配色: cyan / violet / pink / lime / gold
+#    group   分组名
+# ============================================================
+
+- name: IdealizedPreviewer
+  desc: 我的个人工具箱,收录了一些自己写的小工具和零散代码。
+  lang: JavaScript
+  link: https://cos-cross.github.io/IdealizedPreviewer/
+  repo: https://github.com/cos-cross/IdealizedPreviewer
+  tags: [工具箱, 前端, 在线可用]
+  icon: code
+  accent: cyan
+  group: 在线工具
+
+- name: GuessLetter
+  desc: 音游开字母网站,给开字母出题人用的在线工具。
+  lang: HTML
+  link: https://cos-cross.github.io/GuessLetter/
+  repo: https://github.com/cos-cross/GuessLetter
+  tags: [音游, 开字母, 网页]
+  icon: music
+  accent: pink
+  group: 在线工具
+
+- name: AutoLetter
+  desc: 半自动化音游开字母机器,让出题人能更方便快捷地创建开字母题目。
+  lang: Python
+  link: ''
+  repo: https://github.com/cos-cross/AutoLetter
+  tags: [音游, Python, 自动化]
+  icon: music
+  accent: violet
+  group: 音游相关
+
+- name: CWMathConsole
+  desc: 一个简单的数学计算控制台。
+  lang: Python
+  link: ''
+  repo: https://github.com/cos-cross/CWMathConsole
+  tags: [数学, Python, 控制台]
+  icon: code
+  accent: lime
+  group: 数学 / 学习
+
+- name: oifastsnippets
+  desc: 一个 VS Code 扩展,用来补全 OI 竞赛中高频使用的代码片段。
+  lang: VS Code
+  link: ''
+  repo: https://github.com/cos-cross/oifastsnippets
+  tags: [OI, 扩展, 效率]
+  icon: star
+  accent: gold
+  group: 数学 / 学习
+
+- name: FinalShellActivator
+  desc: 一个用于激活 FinalShell 的小工具。
+  lang: Kotlin
+  link: ''
+  repo: https://github.com/cos-cross/FinalShellActivator
+  tags: [Kotlin, 工具]
+  icon: code
+  accent: violet
+  group: 小玩意
+
+- name: iKunPong
+  desc: iKun Pong 小游戏,写着玩的。
+  lang: HTML
+  link: ''
+  repo: https://github.com/cos-cross/iKunPong
+  tags: [小游戏, 娱乐]
+  icon: star
+  accent: pink
+  group: 小玩意
+
+- name: cos-cross.github.io
+  desc: 就是你现在看到的这个博客,基于 Hexo,主题是手写的。
+  lang: Hexo
+  link: https://cos-cross.github.io/
+  repo: https://github.com/cos-cross/cos-cross.github.io
+  tags: [博客, Hexo, 开源]
+  icon: link
+  accent: cyan
+  group: 小玩意

@@ -1,0 +1,16 @@
+<% if (page.total && page.total > 1) { %>
+<nav class="pager" aria-label="分页导航">
+  <%- paginator({
+    prev_text: '← 上一页',
+    next_text: '下一页 →',
+    space: '…',
+    end_size: 1,
+    mid_size: 2,
+    page_class: 'pager-num',
+    current_class: 'is-current',
+    space_class: 'pager-space',
+    prev_class: 'pager-nav pager-prev',
+    next_class: 'pager-nav pager-next'
+  }) %>
+</nav>
+<% } %>

@@ -1,0 +1,65 @@
+<%
+  var posts = page.posts ? page.posts.toArray() : [];
+  var headingTitle, headingSub;
+  if (is_tag()) {
+    headingTitle = '#' + page.tag;
+    headingSub = '这个标签下的全部文章';
+  } else if (is_category()) {
+    headingTitle = page.category;
+    headingSub = '这个分类下的全部文章';
+  } else {
+    headingTitle = '全部文章';
+    headingSub = '写过的代码、想过的问题、打过的谱面';
+  }
+%>
+
+<section class="page-hero">
+  <p class="page-kicker">ARCHIVE</p>
+  <h1 class="page-title grad-text"><%= headingTitle %></h1>
+  <p class="page-sub"><%= headingSub %> · 共 <b><%= page.total ? (site.posts.length) : posts.length %></b> 篇</p>
+
+  <% if (is_archive() && site.tags.length) { %>
+  <div class="tag-cloud tag-cloud-sm">
+    <% site.tags.sort('length', -1).limit(24).each(function (tag) { %>
+    <a class="tag-pill" href="<%= url_for(tag.path) %>"><span class="tag-hash">#</span><%= tag.name %><span class="tag-count"><%= tag.length %></span></a>
+    <% }); %>
+  </div>
+  <% } %>
+</section>
+
+<% if (posts.length) { %>
+<section class="archive-wrap">
+  <%
+    var currentYear = null;
+  %>
+  <% posts.forEach(function (post) { %>
+    <%
+      var year = date(post.date, 'YYYY');
+      var plain = strip_html(post.content || '').replace(/\s+/g, '');
+      var readMin = Math.max(1, Math.ceil(plain.length / 350));
+      var cats = (post.categories && post.categories.length) ? post.categories.toArray() : [];
+    %>
+    <% if (year !== currentYear) { %>
+      <% if (currentYear !== null) { %></ul><% } %>
+      <% currentYear = year; %>
+      <h2 class="archive-year"><span class="year-dot"></span><%= year %></h2>
+      <ul class="archive-items">
+    <% } %>
+      <li class="archive-item">
+        <a href="<%= url_for(post.path) %>">
+          <time datetime="<%= date_xml(post.date) %>"><%= date(post.date, 'MM-DD') %></time>
+          <span class="archive-title"><%= post.title %></span>
+          <span class="archive-meta">
+            <% if (cats.length) { %><span class="archive-cat"><%= cats[0].name %></span><% } %>
+            <span class="archive-read">≈<%= readMin %>min</span>
+          </span>
+        </a>
+      </li>
+  <% }); %>
+  <% if (currentYear !== null) { %></ul><% } %>
+</section>
+
+<%- partial('_partial/pager') %>
+<% } else { %>
+<p class="empty-tip">这里还没有内容。</p>
+<% } %>
