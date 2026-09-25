@@ -1239,6 +1239,9 @@
     var ctx = canvas.getContext('2d');
     var kind = el.dataset.kind;
     var state = { panX: 0, panY: 0 };
+    // 注意:必须声明在 try 外面 —— resample() 定义在 try 之后,
+    // 用 const 写在 try 块里会因为块级作用域而看不见它(区域模式就是这么挂掉的)。
+    const varNames = kind === '3d' ? ['x', 'y', 'z'] : ['x', 'y'];
 
     function fail(msg) {
       showError(el, msg);
@@ -1247,7 +1250,6 @@
     try {
       // 每条曲线 / 每个点都带自己的约束(构建期已经把全局约束并进去了),
       // 所以这里给每一条单独编译一个 mask。
-      const varNames = kind === '3d' ? ['x', 'y', 'z'] : ['x', 'y'];
       const compiled = (payload.items || []).map(function (it) {
         const tests = (it.constraints || []).map(function (c) {
           return compileConstraint(c, varNames);
@@ -1265,11 +1267,14 @@
         }
         state.cam = { az: -0.62, el: 0.52, dist: 3.4, focal: 3.4, zoom: 1 };
 
-        // 点从数学坐标换算到和曲面同一套归一化立方体里
+        // 点从数学坐标换算到和曲面同一套归一化立方体里。
+        // 显式曲面的 opts.z 是"颜色映射范围"、允许为 null,这时用曲面实际的高度范围兜底。
         const [ax, bx] = payload.opts.x;
         const [ay, by] = payload.opts.y;
-        const [az2, bz2] = payload.opts.z;
-        const cx = (ax + bx) / 2, cy = (ay + by) / 2, cz = (az2 + bz2) / 2;
+        const zr = Array.isArray(payload.opts.z)
+          ? payload.opts.z
+          : (state.surface ? [state.surface.zmin, state.surface.zmax] : [-1, 1]);
+        const cx = (ax + bx) / 2, cy = (ay + by) / 2, cz = (zr[0] + zr[1]) / 2;
         const scope = makeScope(['x', 'y', 'z']);
         state.points = compiled.filter(function (it) {
           if (it.type !== 'point') return false;
@@ -1279,7 +1284,7 @@
         }).map(function (p) {
           return {
             nx: (p.x - cx) / ((bx - ax) / 2 || 1),
-            ny: (p.z - cz) / ((bz2 - az2) / 2 || 1),
+            ny: (p.z - cz) / ((zr[1] - zr[0]) / 2 || 1),
             nz: (p.y - cy) / ((by - ay) / 2 || 1),
             label: p.label,
           };
@@ -1312,7 +1317,15 @@
         state.colors = COLORS;
         state.opts = payload.opts;
         state.renderedSeries = [];
-        state.view = { x0: payload.opts.x[0], x1: payload.opts.x[1], y0: -1, y1: 1 };
+        // 初值必须直接用作者给的 y 范围 —— 之前这里写死成 [-1,1],
+        // 而 autoFitY 在"作者指定了 y"时会提前 return,于是 opts.y 从来没生效过:
+        // 区域会被算成 4×2 的窗口(格子数翻倍)、图形被纵向压扁。
+        state.view = {
+          x0: payload.opts.x[0],
+          x1: payload.opts.x[1],
+          y0: payload.opts.y ? payload.opts.y[0] : -1,
+          y1: payload.opts.y ? payload.opts.y[1] : 1,
+        };
       }
     } catch (e) {
       fail(e.message);
@@ -1352,7 +1365,8 @@
     }
 
     function autoFitY() {
-      if (kind === '3d' || state.opts.y) return;
+      if (kind === '3d') return;
+      if (state.opts && state.opts.y) return; // 作者指定了 y 范围,别自作主张
       var lo = Infinity, hi = -Infinity;
       (state.renderedSeries || []).forEach(function (item) {
         if (item.kind !== 'explicit') return;
@@ -1377,9 +1391,18 @@
       el.dataset.ready = '1';
     }
 
-    resample();
-    autoFitY();
-    draw();
+    // 采样/绘制也兜一层:出错就显示提示,而不是让异常冒到调用方变成白屏
+    function safe(fn) {
+      try {
+        fn();
+      } catch (e) {
+        fail(e && e.message ? e.message : String(e));
+      }
+    }
+
+    safe(resample);
+    safe(autoFitY);
+    safe(draw);
 
     // ---- 交互 ----
     var dragging = false;

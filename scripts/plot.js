@@ -283,8 +283,9 @@ hexo.extend.filter.register('after_post_render', function (data) {
     const curves = items.filter((it) => it.type !== 'point');
     const points = items.filter((it) => it.type === 'point');
 
-    // 只有点、没有任何曲线时,纵轴按点自动定范围(留 20% 边距)
-    if (kind === '2d' && points.length && !curves.length) {
+    // 整块只有独立的点(既没有曲线,也不是区域模式)时,纵轴按点自动定范围。
+    // 区域模式下不能这么做 —— 否则画布会被几个点挤成一条窄带,区域就看不出来了。
+    if (kind === '2d' && points.length && !curves.length && !globalConds.length) {
       const ys = points.map((p) => p.y);
       if (!Array.isArray(o.y)) {
         const lo = Math.min(...ys);

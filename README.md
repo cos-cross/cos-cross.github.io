@@ -90,7 +90,8 @@ npm install --ignore-scripts
 | `npm run deploy` | 构建并发布到 `gh-pages` 分支 |
 | `npm run verify` | 部署后验证线上站点(页面 + 静态资源是否真的可达) |
 | `npm run verify:plots` | 专项验证线上函数图像:把页面上的每个式子用同一份核心重算一遍 |
-| `npm run test` | 跑绘图核心的 125 项单元测试 |
+| `npm run test` | 绘图核心单元测试(125 项)+ 无头渲染测试(24 项) |
+| `npm run test:render` | 只跑无头渲染测试 |
 | `npm run wallpaper -- 2903241954` | 从 Wallpaper Engine 导入壁纸当背景 |
 | `npm run wallpaper -- --list` | 列出本机所有 Wallpaper Engine 壁纸 |
 | `npm run mdblog` | 把 `mdblog/` 里的笔记同步成文章 |
@@ -644,8 +645,23 @@ WARN    - _posts/xxx.md:"sin(x" —— 函数调用缺少 ")"
 WARN    - _posts/xxx.md:"foo(x,y)" —— 未知函数:"foo"
 ```
 
-绘制代码只在**含图像的页面**加载(`layout.ejs` 靠正文里有没有 `class="plot"` 判断),
-其他页面完全不受影响。
+### 改绘图代码之后:两层测试都得跑
+
+```bash
+npm run test            # 125 项数学单测 + 24 项无头渲染测试
+npm run verify:plots    # 部署后把线上每个式子重算一遍
+```
+
+**两层测试缺一不可**,这是踩出来的:
+
+- `tools/test-plot.mjs` 验证**数学核心**(解析、采样、网格、投影)—— 但它验证不了"画不画得出来";
+- `tools/test-render.mjs` 用**桩 canvas 在 Node 里跑真实的 `mount()`**,记录所有 canvas 调用,于是渲染问题也能被发现。
+
+第二层抓到过一个第一层完全看不见的 bug:`const varNames` 写在 `try` 块里,而 `resample()` 定义在块外 —— 块级作用域导致区域模式一进去就抛 `ReferenceError`,页面显示"图像无法绘制"。数学全对,但图出不来。
+
+同一个 harness 还发现:**2D 视图的 y 范围从来没应用过作者写的 `y=`**(初值写死 `[-1,1]`,而 `autoFitY` 在指定了 y 时会提前 return)—— 所有带 `y=` 的图都被纵向压扁,区域更是按 4×2 的窗口算,格子数直接翻倍。
+
+绘制代码只在**含图像的页面**加载(`layout.ejs` 靠正文里有没有 `class="plot"` 判断),其他页面完全不受影响。脚本 URL 带 `?v=` 版本号,payload 结构变化时用来防缓存。
 
 
 
