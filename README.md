@@ -38,6 +38,7 @@
 ├── tools/
 │   ├── deploy.mjs            # 部署到 gh-pages
 │   ├── check.mjs             # 构建产物自检
+│   ├── verify-live.mjs       # 线上站点验证
 │   └── vendor-katex.mjs      # 复制 KaTeX 运行时资源
 └── public/                   # 构建产物(不进版本库)
 ```
@@ -60,6 +61,7 @@ npm install --ignore-scripts
 | `npm run build` | 构建静态文件到 `public/` |
 | `npm run check` | 构建并自检产物(死链、模板残留、关键结构) |
 | `npm run deploy` | 构建并发布到 `gh-pages` 分支 |
+| `npm run verify` | 部署后验证线上站点(页面 + 静态资源是否真的可达) |
 | `npm run new "标题"` | 新建一篇文章 |
 | `npm run vendor:katex` | 从 `node_modules/katex` 重新复制运行时资源 |
 
