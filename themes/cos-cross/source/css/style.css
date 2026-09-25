@@ -1044,6 +1044,7 @@ p { margin: 0; }
 .post-crumbs a { transition: color .2s var(--ease); }
 .post-crumbs a:hover { color: var(--cyan); }
 .crumb-cat { color: var(--violet); }
+.crumb-cat:hover { color: var(--cyan); }
 .post-title { font-size: clamp(27px, 4.6vw, 40px); letter-spacing: -.02em; margin-bottom: 18px; }
 .post-meta {
   display: flex;
@@ -1055,6 +1056,8 @@ p { margin: 0; }
   color: var(--text-3);
 }
 .meta-item { display: inline-flex; align-items: center; gap: 6px; }
+.meta-item a { transition: color .2s var(--ease); }
+.meta-item a:hover { color: var(--cyan); }
 .meta-updated { color: var(--gold); }
 .post-tags { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
 

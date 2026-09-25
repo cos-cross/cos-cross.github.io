@@ -14,7 +14,7 @@
       <a href="<%= url_for('/') %>">首页</a>
       <span>/</span>
       <a href="<%= url_for('/archives/') %>">文章</a>
-      <% if (cats.length) { %><span>/</span><span class="crumb-cat"><%= cats[0].name %></span><% } %>
+      <% if (cats.length) { %><span>/</span><a class="crumb-cat" href="<%= url_for(cats[0].path) %>"><%= cats[0].name %></a><% } %>
     </nav>
 
     <h1 class="post-title"><%= page.title %></h1>
@@ -28,7 +28,12 @@
       <span class="meta-item meta-updated"><%- partial('_partial/icon', { name: 'star', size: 14 }) %>更新于 <%= date(page.updated, 'YYYY-MM-DD') %></span>
       <% } %>
       <% if (cats.length) { %>
-      <span class="meta-item"><%- partial('_partial/icon', { name: 'folder', size: 14 }) %><%= cats.map(function (c) { return c.name; }).join(' / ') %></span>
+      <span class="meta-item"><%- partial('_partial/icon', { name: 'folder', size: 14 }) %><%
+        cats.forEach(function (c, i) {
+          if (i) { %> / <% }
+          %><a href="<%= url_for(c.path) %>"><%= c.name %></a><%
+        });
+      %></span>
       <% } %>
     </div>
 
