@@ -9,6 +9,7 @@ db.json
 .deploy-tmp/
 .avatar-tmp/
 .wallpaper-tmp/
+.notebook-tmp/
 .gh-pages-worktree/
 
 # ---- 随手放的草稿 / 密钥,别误提交 ----

@@ -1365,6 +1365,103 @@ p { margin: 0; }
 }
 .callout p { margin: 0 !important; color: var(--text-2); font-size: 14.5px; }
 
+/* ---------- 可运行笔记单元格(scripts/notebook.js 生成) ---------- */
+.nb-cell {
+  margin: 1.9em 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.nb-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(155, 123, 255, .12), transparent);
+  font: 600 12px/1.5 var(--mono);
+}
+.nb-lang {
+  padding: 3px 10px;
+  border-radius: 99px;
+  color: #07070f;
+  background: var(--grad-main);
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+.nb-meta { color: var(--text-3); }
+.nb-status { margin-left: auto; letter-spacing: .06em; }
+.nb-status.is-ok { color: var(--lime); }
+.nb-status.is-error { color: #ff6b6b; }
+.nb-copy {
+  padding: 4px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text-3);
+  font: inherit;
+  transition: all .2s var(--ease);
+}
+.nb-copy:hover { color: var(--cyan); border-color: var(--cyan); }
+
+/* 里面的代码块把外边距 / 圆角 / 装饰全交出去,由卡片统一负责 */
+.nb-cell .highlight {
+  margin: 0 !important;
+  padding-top: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+.nb-cell .highlight::before { display: none !important; }      /* 红黄绿三个圆点 */
+.nb-cell .highlight figcaption { display: none !important; }    /* exec 标记 */
+.nb-cell .highlight .gutter pre { background: rgba(255, 255, 255, .03); }
+
+.nb-out {
+  border-top: 1px solid var(--line);
+  background: rgba(0, 0, 0, .22);
+}
+[data-theme="light"] .nb-out { background: rgba(20, 20, 60, .04); }
+
+.nb-out-head { padding: 10px 16px 0; }
+.nb-out-label {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 6px;
+  font: 700 10.5px/1.7 var(--mono);
+  letter-spacing: .08em;
+  color: var(--cyan);
+  background: rgba(46, 230, 255, .12);
+  border: 1px solid rgba(46, 230, 255, .25);
+}
+.nb-out-body {
+  margin: 0 !important;
+  padding: 11px 16px 14px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  font: 500 13.5px/1.72 var(--mono);
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+.nb-out-body.is-stderr {
+  color: #ff9a9a;
+  background: rgba(255, 80, 80, .08) !important;
+  border-top: 1px dashed rgba(255, 80, 80, .28) !important;
+}
+.nb-out-body.is-empty { color: var(--text-3); font-style: italic; }
+
+@media (max-width: 520px) {
+  .nb-bar { gap: 7px; padding: 8px 11px; }
+  .nb-meta { display: none; }
+  .nb-out-body { font-size: 12.5px; padding: 10px 12px 12px !important; }
+}
+
 /* 数学公式 */
 .katex-display {
   margin: 1.4em 0 !important;

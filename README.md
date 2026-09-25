@@ -37,7 +37,8 @@
 │   │   └── _partial/         # 导航、页脚、卡片等片段
 │   └── source/               # css / js / 图片 / KaTeX
 ├── scripts/
-│   └── empty-site-fallback.js  # Hexo 插件:零文章时兜底生成首页 / 归档 / RSS
+│   ├── empty-site-fallback.js  # Hexo 插件:零文章时兜底生成首页 / 归档 / RSS
+│   └── notebook.js             # Hexo 插件:代码围栏加 exec 即可执行并输出结果
 ├── assets/
 │   └── avatar-source.jpg      # 头像原图(不进主题目录 → 不会被发布到线上)
 ├── tools/
@@ -328,6 +329,79 @@ npm run projects -- check
 ```bash
 npx hexo generate && node tools/deploy.mjs
 ```
+
+## 在文章里插可运行的代码块
+
+在代码围栏的 info 串里加一个 `exec` 标记,**构建时会真正执行这个格子,并把输出一起渲染进文章**:
+
+````markdown
+```python exec
+print(2 ** 10)
+```
+````
+
+渲染出来是这样:
+
+```python exec
+print(2 ** 10)
+```
+
+读者打开网页直接看到真实结果 —— 不需要装 Python、不需要后端、不需要等任何东西加载。这和 `jupyter nbconvert` 导出 HTML 是一个思路:notebook 在本地跑,输出被固化进文档。
+
+### 支持的语言
+
+| 写什么 | 用什么执行 |
+| --- | --- |
+| `python exec` | `python`(可在配置里换成 `py -3` 或绝对路径) |
+| `javascript exec` / `node exec` / `js exec` | 当前 Node(`process.execPath`,不会解析到别的版本) |
+| `pwsh exec` / `powershell exec` | `pwsh` |
+| `bash exec` / `sh exec` | `bash` |
+| `ruby exec` | `ruby` |
+
+执行用的解释器和显示用的高亮是分开的 —— 比如 `node` 这个词在 highlight.js 里不存在,会降级成无高亮,所以代码显示时用的是 `javascript` 的词法。
+
+### 配置
+
+`_config.yml`:
+
+```yaml
+notebook:
+  enable: true
+  timeout: 20000        # 单格最长运行时间,超时终止并在页面上说明
+  cache: true           # 按「语言+代码」哈希缓存输出,没改过的格子重建时不重复执行
+  max_output: 20000     # 输出截断阈值
+  runners:
+    python: python      # 换成 py -3 / C:\Python314\python.exe 之类的都行
+```
+
+### 几个已经处理掉的坑
+
+- **输出会缓存**,第二次构建是 `本次执行 0 格,命中缓存 5 格`;
+- **子进程输出重定向到文件而不是管道**,受限环境和普通终端都能跑;
+- **强制 UTF-8**(`PYTHONIOENCODING`),否则 Windows 上中文输出是乱码;
+- **traceback 里的本机路径会被抹掉**,只留 `cell.py`;
+- **报错如实显示**:代码写错了,页面就显示真实 traceback(输出区红底),这比贴截图诚实得多;
+- **超时保护**:写死循环也不会卡住构建。
+
+### 改插件后不生效?
+
+Hexo 的 `db.json` 渲染缓存会**跳过整个过滤器链** —— 文章内容没变时它直接复用上次的渲染结果。改了 `scripts/notebook.js` 想验证:
+
+```bash
+rm -f db.json && npm run build
+```
+
+### 想让读者自己改代码重跑?
+
+那就得在浏览器里跑 Python,唯一的路子是 **Pyodide**(CPython 编译成 WebAssembly),首次要下 10~20 MB。取舍很清楚:
+
+| | 构建期执行(当前方案) | Pyodide |
+| --- | --- | --- |
+| 读者要下载 | 0 | 首次 10~20 MB |
+| 能改代码重跑 | 不能 | 能 |
+| 国内网络 | 无影响 | 要能访问 CDN,或自己托管 |
+
+博客场景里 90% 的需求是"**看到**真实输出",构建期执行就够了。真要上 Pyodide,务必做成**点按钮才加载**,别让不想跑的人陪着下十几 MB。
 
 ## 部署
 

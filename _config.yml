@@ -16,6 +16,23 @@ timezone: Asia/Shanghai
 # 未认证请求看不到任何私有仓库,所以私有仓库一旦写进清单就会被当场发现。
 github_user: cos-cross
 
+# ---------- 文章里的"可运行笔记"单元格 ----------
+# 在代码围栏的 info 串里加 exec 标记,构建时会真正执行并把输出渲染进文章:
+#
+#   ```python exec
+#   print(2 ** 10)
+#   ```
+#
+# 读者打开网页直接看到真实运行结果,不需要装任何东西。
+notebook:
+  enable: true
+  timeout: 20000        # 单格最长运行时间(毫秒),超时会被终止并显示提示
+  cache: true           # 按代码内容缓存输出;没改过的格子重建时不会重复执行
+  max_output: 20000     # 输出超过这么多字符就截断
+  runners:              # 语言 → 可执行文件,留空用内置默认值
+    python: python
+    node: node
+
 # ---------- 网址 ----------
 url: https://cos-cross.github.io
 root: /

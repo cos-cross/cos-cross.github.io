@@ -171,7 +171,11 @@
 
   /* ---------- 6. 代码块复制 ---------- */
   (function codeCopy() {
-    var blocks = $$('.post-content figure.highlight, .post-content > pre');
+    // 可运行笔记单元格(nb-cell)自带 bar 上的复制按钮,这里要排除掉,
+    // 免得同一个代码块上出现两个复制按钮。
+    var blocks = $$('.post-content figure.highlight, .post-content > pre').filter(function (block) {
+      return !(block.closest && block.closest('.nb-cell'));
+    });
     blocks.forEach(function (block) {
       var btn = document.createElement('button');
       btn.type = 'button';
@@ -205,6 +209,30 @@
       try { document.execCommand('copy'); done(); } catch (e) { /* 忽略 */ }
       document.body.removeChild(ta);
     }
+  })();
+
+  /* ---------- 6.1 可运行笔记单元格:复制代码 ---------- */
+  (function nbCopy() {
+    $$('.nb-copy').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var cell = btn.closest('.nb-cell');
+        var codeEl = cell && cell.querySelector('.highlight td.code, .highlight pre');
+        if (!codeEl) return;
+        var text = codeEl.innerText;
+
+        var done = function () {
+          var original = btn.textContent;
+          btn.textContent = '已复制 ✓';
+          setTimeout(function () { btn.textContent = original; }, 1600);
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, function () { window.prompt('复制这段代码:', text); });
+        } else {
+          window.prompt('复制这段代码:', text);
+        }
+      });
+    });
   })();
 
   /* ---------- 7. 复制文章链接 ---------- */
