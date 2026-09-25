@@ -137,6 +137,79 @@ ok('着色系数都为正', quads.every((q) => q.light > 0));
 ok('颜色参数 t 落在 [0,1]', quads.every((q) => q.t >= 0 && q.t <= 1));
 ok('四边形顶点数正确', quads.every((q) => q.pts.length === 4));
 
+console.log('\n=== 隐式方程:marching squares(2D 等值线) ===');
+const circle = Kit.marchingSquares(
+  Kit.compileImplicit('x^2 + y^2 = 1', ['x', 'y']),
+  { x: [-2, 2], y: [-2, 2], nx: 180, ny: 180 },
+);
+ok('圆能提取出等值线段', circle.length > 100, `${circle.length} 段`);
+const circleErr = Math.max(...circle.flat().map((p) => Math.abs(Math.hypot(p.x, p.y) - 1)));
+ok('圆上的点都在半径 1 附近', circleErr < 0.02, `最大偏差 ${circleErr.toFixed(4)}`);
+ok('圆上的点不会跑到范围外', circle.every((s) => s.every((p) => Math.abs(p.x) <= 2.01 && Math.abs(p.y) <= 2.01)));
+
+const ellipse = Kit.marchingSquares(
+  Kit.compileImplicit('x^2/4 + y^2 = 1', ['x', 'y']),
+  { x: [-3, 3], y: [-2, 2], nx: 200, ny: 200 },
+);
+const ellipseErr = Math.max(...ellipse.flat().map((p) => Math.abs(p.x ** 2 / 4 + p.y ** 2 - 1)));
+ok('椭圆 x²/4+y²=1 提取正确', ellipse.length > 100 && ellipseErr < 0.03, `最大偏差 ${ellipseErr.toFixed(4)}`);
+
+const hyperbola = Kit.marchingSquares(
+  Kit.compileImplicit('x^2 - y^2 = 1', ['x', 'y']),
+  { x: [-3, 3], y: [-3, 3], nx: 200, ny: 200 },
+);
+ok('双曲线两支都能提取', hyperbola.length > 100, `${hyperbola.length} 段`);
+ok('双曲线两支分别落在 |x|>1 两侧', new Set(hyperbola.flat().map((p) => p.x > 0)).size === 2);
+
+const line = Kit.marchingSquares(
+  Kit.compileImplicit('y = 2*x + 1', ['x', 'y']),
+  { x: [-5, 5], y: [-5, 5], nx: 100, ny: 100 },
+);
+const lineErr = Math.max(...line.flat().map((p) => Math.abs(p.y - (2 * p.x + 1))));
+ok('直线 y=2x+1 提取正确', line.length > 50 && lineErr < 0.05, `最大偏差 ${lineErr.toFixed(4)}`);
+
+const saddle = Kit.marchingSquares(
+  Kit.compileImplicit('x*y = 0', ['x', 'y']),
+  { x: [-1, 1], y: [-1, 1], nx: 100, ny: 100 },
+);
+ok('鞍点 x·y=0(两条坐标轴)也能正确提取', saddle.length > 100, `${saddle.length} 段`);
+
+console.log('\n=== 隐式方程:surface nets(3D 等值面) ===');
+const sphere = Kit.surfaceNets(
+  Kit.compileImplicit('x^2 + y^2 + z^2 = 1', ['x', 'y', 'z']),
+  { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 32 },
+);
+ok('球面生成了顶点', sphere.verts.length > 500, `${sphere.verts.length} 个顶点`);
+ok('球面生成了四边形', sphere.quads.length > 500, `${sphere.quads.length} 个面`);
+const sphereErr = Math.max(...sphere.verts.map((v) => Math.abs(Math.hypot(v.x * 2, v.y * 2, v.z * 2) - 1)));
+ok('球面顶点都在半径 1 附近(归一化坐标 ×2 还原)', sphereErr < 0.08, `最大偏差 ${sphereErr.toFixed(4)}`);
+ok('所有四边形索引都合法', sphere.quads.every((q) => q.every((i) => i >= 0 && i < sphere.verts.length)));
+ok('顶点都落在归一化立方体里', sphere.verts.every((v) => Math.abs(v.x) <= 1.001 && Math.abs(v.y) <= 1.001 && Math.abs(v.z) <= 1.001));
+ok('法线是单位向量', sphere.verts.every((v) => Math.abs(Math.hypot(v.nx, v.ny, v.nz) - 1) < 1e-6));
+ok('颜色参数 t 在 [0,1]', sphere.verts.every((v) => v.t >= 0 && v.t <= 1));
+
+const meshCam = { az: -0.62, el: 0.52, dist: 3.4, focal: 3.4, zoom: 1 };
+const meshQuads = Kit.projectMeshQuads(sphere, meshCam, W, H, {});
+ok('网格能投影出屏幕四边形', meshQuads.length > 400, `${meshQuads.length} 个`);
+ok('投影后的顶点都是有限数', meshQuads.every((q) => q.pts.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))));
+ok('网格投影也按深度从远到近排序', meshQuads.every((q, i) => i === 0 || meshQuads[i - 1].depth >= q.depth));
+ok('网格着色的光照系数都为正', meshQuads.every((q) => q.light > 0));
+
+const torus = Kit.surfaceNets(
+  Kit.compileImplicit('(x^2 + y^2 + z^2 + 0.6)^2 = 4*(x^2 + y^2)', ['x', 'y', 'z']),
+  { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 32 },
+);
+ok('环面这类复杂曲面也能提取', torus.verts.length > 500 && torus.quads.length > 500,
+  `${torus.verts.length} 顶点 / ${torus.quads.length} 面`);
+
+console.log('\n=== 等式解析 ===');
+ok('parseEquation 认出显式', Kit.parseEquation('sin(x)').implicit === false);
+ok('parseEquation 认出隐式', Kit.parseEquation('x^2 + y^2 = 1').implicit === true);
+ok('双等号会报错', (() => { try { Kit.parseEquation('a = b = c'); return false; } catch { return true; } })());
+ok('隐式式子里未知符号照样报错', (() => {
+  try { Kit.compileImplicit('x^2 + q^2 = 1', ['x', 'y']); return false; } catch (e) { return /未知符号/.test(e.message); }
+})());
+
 console.log('\n=== 刻度与配色 ===');
 ok('niceStep 给出整齐的步长', [Kit.niceStep(10, 8), Kit.niceStep(1, 8), Kit.niceStep(1000, 5)]
   .every((v) => { const m = v / 10 ** Math.round(Math.log10(v)); return [1, 2, 5].some((k) => near(m, k) || near(m * 10, k)); }));

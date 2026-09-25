@@ -137,18 +137,16 @@ function readPlotBlocks(sourcePath) {
 
 /* ---------- 生成容器 ---------- */
 
-function buildBlock(kind, exprs, opts, rawSource, label) {
-  const is3d = kind === '3d';
-  const payload = is3d ? { expr: exprs[0], opts } : { exprs, opts };
+function buildBlock(kind, payload, opts, rawSource, label, ratio) {
   // JSON 直接嵌在 <script> 里,把 < 转义掉才不会被当成结束标签
   const json = JSON.stringify(payload).replace(/</g, '\\u003c');
 
-  const hint = is3d
+  const hint = kind === '3d'
     ? '拖动旋转 · 滚轮缩放 · 双击重置'
     : '滚轮缩放 · 拖动平移 · 双击重置';
 
   return [
-    `<div class="plot" data-kind="${kind}" data-mount>`,
+    `<div class="plot" data-kind="${kind}" data-mount${ratio ? ` data-ratio="${ratio}"` : ''}>`,
     '  <div class="plot-bar">',
     `    <span class="plot-kind">${escapeHtml(label)}</span>`,
     `    <span class="plot-hint">${hint}</span>`,
@@ -187,42 +185,92 @@ hexo.extend.filter.register('after_post_render', function (data) {
 
     const block = list.shift();
     const kind = block.kind;
-    const exprs = code.split('\n').map((s) => s.trim()).filter((s) => s && !s.startsWith('#'));
-    if (!exprs.length) {
+    const all = code.split('\n').map((s) => s.trim()).filter((s) => s && !s.startsWith('#'));
+    if (!all.length) {
       problems.push(`${data.source}:一个 plot${kind} 代码块里没有表达式`);
       return whole;
     }
 
-    const used = kind === '3d' ? exprs.slice(0, 1) : exprs.slice(0, 6);
-
-    // 构建期先编译一遍:语法错、未知符号在这里就报出来,不用等打开网页
-    used.forEach((expr) => {
-      try {
-        Kit.compile(expr, kind === '3d' ? ['x', 'y'] : ['x']);
-      } catch (e) {
-        problems.push(`${data.source}:"${expr}" —— ${e.message}`);
-      }
-    });
-
     const o = block.optsRaw;
-    const opts = kind === '3d'
-      ? {
-        x: normalizeRange(o.x, [-5, 5]),
-        y: normalizeRange(o.y, [-5, 5]),
-        z: Array.isArray(o.z) ? normalizeRange(o.z, [-1, 1]) : null,
-        grid: Math.max(8, Math.min(90, o.grid || 46)),
+    // 含等号的当隐式方程处理,其余是显式函数
+    const equations = all.filter((s) => s.includes('='));
+    const explicit = all.filter((s) => !s.includes('='));
+
+    // 构建期编译一遍:语法错、未知符号、等号写多了都在这里报出来
+    const validate = (src, vars) => {
+      try {
+        if (src.includes('=')) Kit.compileImplicit(src, vars);
+        else Kit.compile(src, vars);
+      } catch (e) {
+        problems.push(`${data.source}:"${src}" —— ${e.message}`);
       }
-      : {
-        x: normalizeRange(o.x, [-10, 10]),
-        y: Array.isArray(o.y) ? normalizeRange(o.y, [-1, 1]) : null,
+    };
+
+    let payload;
+    let label;
+    let ratio = null;
+
+    if (kind === '3d') {
+      const isImplicit = all[0].includes('=');
+      if (all.length > 1) {
+        problems.push(`${data.source}:3D 只支持一个式子,后面的被忽略了`);
+      }
+      validate(all[0], ['x', 'y', 'z']);
+      if (isImplicit) {
+        const opts = {
+          x: normalizeRange(o.x, [-2, 2]),
+          y: normalizeRange(o.y, [-2, 2]),
+          z: normalizeRange(o.z, [-2, 2]),
+          grid: Math.max(8, Math.min(64, o.grid || 28)),
+        };
+        payload = { expr: all[0], opts, implicit: true };
+        label = `3D 等值面 · ${all[0]}`;
+      } else {
+        validate(all[0], ['x', 'y']);
+        const opts = {
+          x: normalizeRange(o.x, [-5, 5]),
+          y: normalizeRange(o.y, [-5, 5]),
+          z: Array.isArray(o.z) ? normalizeRange(o.z, [-1, 1]) : null,
+          grid: Math.max(8, Math.min(90, o.grid || 46)),
+        };
+        payload = { expr: all[0], opts };
+        label = `3D 曲面 · z = ${all[0]}`;
+      }
+    } else {
+      const keptExplicit = explicit.slice(0, 6);
+      const keptImplicit = equations.slice(0, 6);
+      keptExplicit.forEach((s) => validate(s, ['x']));
+      keptImplicit.forEach((s) => validate(s, ['x', 'y']));
+      if (keptExplicit.length + keptImplicit.length === 0) {
+        problems.push(`${data.source}:一个 plot2d 代码块里没有可画的式子`);
+        return whole;
+      }
+
+      let xr = normalizeRange(o.x, [-10, 10]);
+      let yr = Array.isArray(o.y) ? normalizeRange(o.y, [-1, 1]) : null;
+      if (keptImplicit.length && !yr) {
+        // 隐式曲线(圆、椭圆…)必须让横纵比例一致,否则会画成扁的:
+        // 默认取和 x 一样宽的正方形窗口,并把画布设成正方形。
+        const cxr = (xr[0] + xr[1]) / 2;
+        const half = (xr[1] - xr[0]) / 2;
+        yr = [cxr - half, cxr + half];
+      }
+      if (keptImplicit.length) ratio = 1;
+
+      const opts = {
+        x: xr,
+        y: yr,
         samples: Math.max(100, Math.min(2000, o.n || 900)),
       };
+      payload = { exprs: keptExplicit, implicit: keptImplicit, opts };
+      const parts = [];
+      if (keptExplicit.length) parts.push(`${keptExplicit.length} 条曲线`);
+      if (keptImplicit.length) parts.push(`${keptImplicit.length} 个方程`);
+      label = `2D · ${parts.join(' + ')}`;
+    }
 
     rendered += 1;
-    const label = kind === '3d'
-      ? `3D 曲面 · z = ${used[0]}`
-      : `2D 曲线 · ${used.length} 条`;
-    return buildBlock(kind, used, opts, code, label);
+    return buildBlock(kind, payload, null, code, label, ratio);
   });
 
   // 有源块但没配上 figure,说明配对失败,要说出来而不是静默失败

@@ -187,38 +187,52 @@
   }
 
   /**
-   * 编译表达式。
-   * allowedVars 之外的符号会被明确报错,而不是悄悄算出 NaN —— 打错一个字母时
-   * 那句"未知符号: xx"比一张空图有用得多。函数名同样要校验,
-   * 否则错的是 `s.foo is not a function` 这种看不懂的运行时错误。
+   * 编译隐式方程 f(x,y)=0 / f(x,y,z)=0。
+   * 把 "左边 = 右边" 变成 "左边 - 右边",于是求等值线/等值面就是在求 f=0。
    */
-  function compile(src, allowedVars) {
-    var ast = parse(src);
-    var names = collectNames(ast);
+  function parseEquation(src) {
+    const parts = String(src).split('=');
+    if (parts.length === 1) return { implicit: false, expr: src.trim() };
+    if (parts.length !== 2) throw new Error('一个式子里只能有一个等号');
+    return { implicit: true, lhs: parts[0].trim(), rhs: parts[1].trim() };
+  }
 
-    Object.keys(names.calls).forEach(function (name) {
+  function compileAst(ast, allowedVars) {
+    const names = collectNames(ast);
+
+    Object.keys(names.calls).forEach((name) => {
       if (!Object.prototype.hasOwnProperty.call(FUNCTIONS, name)) {
         throw new Error('未知函数:"' + name + '"');
       }
     });
-    Object.keys(names.vars).forEach(function (name) {
+    Object.keys(names.vars).forEach((name) => {
       if (allowedVars && allowedVars.indexOf(name) !== -1) return;
       if (Object.prototype.hasOwnProperty.call(CONSTANTS, name)) return;
-      if (Object.prototype.hasOwnProperty.call(FUNCTIONS, name)) return; // 允许 sin 当常量名以外的东西
+      if (Object.prototype.hasOwnProperty.call(FUNCTIONS, name)) return;
       throw new Error('未知符号:"' + name + '"(可用变量:' + (allowedVars || []).join(', ') + ')');
     });
 
-    var body = 'return ' + toJS(ast) + ';';
-    var fn;
+    const body = 'return ' + toJS(ast) + ';';
+    let fn;
     try {
-      fn = new Function('s', body); // 代码串完全由上面的 AST 拼出来,不含用户原始输入
+      fn = new Function('s', body); // 代码串完全由 AST 拼出来,不含用户原始输入
     } catch (e) {
       throw new Error('表达式无法编译:' + e.message);
     }
     return function (scope) {
-      var v = fn(scope);
+      const v = fn(scope);
       return typeof v === 'number' ? v : NaN;
     };
+  }
+
+  function compile(src, allowedVars) {
+    return compileAst(parse(src), allowedVars);
+  }
+
+  function compileImplicit(src, allowedVars) {
+    const eq = parseEquation(src);
+    if (!eq.implicit) throw new Error('不是等式:' + src);
+    return compileAst({ t: 'bin', op: '-', a: parse(eq.lhs), b: parse(eq.rhs) }, allowedVars);
   }
 
   /** 建一个带常量/函数原型的求值作用域(每次求值只改 x/y,避免反复建对象) */
@@ -314,6 +328,246 @@
   }
 
   /* ============================================================
+     三之二、隐式方程:marching squares(2D 等值线)
+     ============================================================ */
+
+  /**
+   * 求 f(x,y)=0 的等值线,返回线段数组。
+   *
+   * 做法:在网格上采样,每个小格看四个角的正负号 —— 有正有负就说明零线穿过这个格,
+   * 在符号变化的边上线性插值出交点,再把交点按规则连起来。这就是 marching squares。
+   *
+   * 每个格子的交点个数只能是 2 或 4:
+   *   - 2 个:直接连;
+   *   - 4 个:是鞍点(比如 f = x·y 在原点附近),必须看格子中心值的正负才能决定
+   *     该"上下连"还是"左右连"。这一步不能省 —— 省了圆锥曲线会在某些角度出现
+   *     错误的交叉连线。
+   */
+  function marchingSquares(fn, opts) {
+    const nx = Math.max(20, Math.min(400, opts.nx || 170));
+    const ny = Math.max(20, Math.min(400, opts.ny || 170));
+    const x0 = opts.x[0], x1 = opts.x[1], y0 = opts.y[0], y1 = opts.y[1];
+    const scope = makeScope(['x', 'y']);
+
+    const sample = (x, y) => {
+      scope.x = x;
+      scope.y = y;
+      const v = fn(scope);
+      return Number.isFinite(v) ? v : NaN;
+    };
+
+    // 网格采样
+    const vals = [];
+    for (let i = 0; i <= nx; i++) {
+      const col = [];
+      const xi = x0 + (x1 - x0) * (i / nx);
+      for (let j = 0; j <= ny; j++) {
+        col.push(sample(xi, y0 + (y1 - y0) * (j / ny)));
+      }
+      vals.push(col);
+    }
+
+    const px = (i) => x0 + (x1 - x0) * (i / nx);
+    const py = (j) => y0 + (y1 - y0) * (j / ny);
+    // 在两值之间找零点:v0 + t(v1-v0) = 0
+    const cross = (ax, ay, av, bx, by, bv) => {
+      const d = av - bv;
+      const t = Math.abs(d) < 1e-15 ? 0.5 : av / d;
+      return { x: ax + (bx - ax) * t, y: ay + (by - ay) * t };
+    };
+
+    const segs = [];
+    for (let i = 0; i < nx; i++) {
+      for (let j = 0; j < ny; j++) {
+        // 四角:0 左下,1 右下,2 右上,3 左上
+        const v0 = vals[i][j];
+        const v1 = vals[i + 1][j];
+        const v2 = vals[i + 1][j + 1];
+        const v3 = vals[i][j + 1];
+        if (!Number.isFinite(v0) || !Number.isFinite(v1)
+          || !Number.isFinite(v2) || !Number.isFinite(v3)) continue;
+        if ((v0 > 0) === (v1 > 0) && (v0 > 0) === (v2 > 0) && (v0 > 0) === (v3 > 0)) continue;
+
+        const X = [px(i), px(i + 1), px(i + 1), px(i)];
+        const Y = [py(j), py(j), py(j + 1), py(j + 1)];
+        const V = [v0, v1, v2, v3];
+
+        // 按边界顺序(边 0,1,2,3)收集交点,天然是环形的
+        const hits = [];
+        for (let e = 0; e < 4; e++) {
+          const a = e, b = (e + 1) % 4;
+          if ((V[a] > 0) === (V[b] > 0)) continue;
+          hits.push(cross(X[a], Y[a], V[a], X[b], Y[b], V[b]));
+        }
+
+        if (hits.length === 2) {
+          segs.push([hits[0], hits[1]]);
+        } else if (hits.length === 4) {
+          // 鞍点:用格子中心的正负号决定怎么连
+          const vc = sample((px(i) + px(i + 1)) / 2, (py(j) + py(j + 1)) / 2);
+          const centerInside = Number.isFinite(vc) ? vc > 0 : (v0 > 0);
+          if (centerInside === (v0 > 0)) {
+            segs.push([hits[0], hits[1]]);
+            segs.push([hits[2], hits[3]]);
+          } else {
+            segs.push([hits[0], hits[3]]);
+            segs.push([hits[1], hits[2]]);
+          }
+        }
+      }
+    }
+    return segs;
+  }
+
+  /* ============================================================
+     三之三、隐式方程:surface nets(3D 等值面)
+     ============================================================ */
+
+  /**
+   * 求 f(x,y,z)=0 的曲面,返回 {verts, quads}。
+   *
+   * 用的是 naive surface nets,而不是经典的 marching cubes:
+   *   - marching cubes 需要一张 256 项、每项最多 16 个索引的查找表,手抄容易错;
+   *   - surface nets 每个"有符号变化的格子"只生成一个顶点(取 12 条棱上交点的平均),
+   *     再对每条有符号变化的网格棱拼一个四边形。代码短得多,而且产出的正好是四边形,
+   *     能直接喂给现有的画家算法渲染器。
+   *
+   * 法线取 f 的梯度(中心差分),比用邻接面算更准也更省事。
+   *
+   * 已知边界行为:如果曲面正好贴到包围盒的面上,那一圈会缺少量四边形。
+   * 把范围开大一点就能避免。
+   */
+  function surfaceNets(fn, opts) {
+    const n = Math.max(8, Math.min(64, opts.grid || 26));
+    const x0 = opts.x[0], x1 = opts.x[1];
+    const y0 = opts.y[0], y1 = opts.y[1];
+    const z0 = opts.z[0], z1 = opts.z[1];
+    const dx = (x1 - x0) / n, dy = (y1 - y0) / n, dz = (z1 - z0) / n;
+    const m = n + 1;
+
+    const scope = makeScope(['x', 'y', 'z']);
+    const at = (i, j, k) => ({ x: x0 + dx * i, y: y0 + dy * j, z: z0 + dz * k });
+    const evalAt = (p) => {
+      scope.x = p.x; scope.y = p.y; scope.z = p.z;
+      const v = fn(scope);
+      return Number.isFinite(v) ? v : NaN;
+    };
+
+    // 采样 (n+1)³
+    const F = new Float64Array(m * m * m);
+    const idx = (i, j, k) => (i * m + j) * m + k;
+    for (let i = 0; i < m; i++) {
+      for (let j = 0; j < m; j++) {
+        for (let k = 0; k < m; k++) {
+          F[idx(i, j, k)] = evalAt(at(i, j, k));
+        }
+      }
+    }
+
+    const CORNER = [
+      [0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0],
+      [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1],
+    ];
+    const EDGE = [
+      [0, 1], [1, 3], [3, 2], [2, 0],
+      [4, 5], [5, 7], [7, 6], [6, 4],
+      [0, 4], [1, 5], [2, 6], [3, 7],
+    ];
+
+    const cellOf = new Int32Array(n * n * n).fill(-1);
+    const cidx = (i, j, k) => (i * n + j) * n + k;
+    const verts = [];
+
+    // 归一化到 [-1,1]³,渲染器只认这个立方体
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = (z0 + z1) / 2;
+
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        for (let k = 0; k < n; k++) {
+          const v = [];
+          let anyNaN = false;
+          let pos = 0;
+          for (let c = 0; c < 8; c++) {
+            const val = F[idx(i + CORNER[c][0], j + CORNER[c][1], k + CORNER[c][2])];
+            if (!Number.isFinite(val)) { anyNaN = true; break; }
+            v.push(val);
+            if (val > 0) pos++;
+          }
+          if (anyNaN || pos === 0 || pos === 8) continue;
+
+          // 12 条棱上的交点求平均 → 这个格子的顶点
+          let sx = 0, sy = 0, sz = 0, cnt = 0;
+          for (let e = 0; e < 12; e++) {
+            const a = EDGE[e][0], b = EDGE[e][1];
+            if ((v[a] > 0) === (v[b] > 0)) continue;
+            const t = v[a] / (v[a] - v[b]);
+            const pa = CORNER[a], pb = CORNER[b];
+            sx += (pa[0] + (pb[0] - pa[0]) * t);
+            sy += (pa[1] + (pb[1] - pa[1]) * t);
+            sz += (pa[2] + (pb[2] - pa[2]) * t);
+            cnt++;
+          }
+          if (!cnt) continue;
+
+          const wx = x0 + dx * (i + sx / cnt);
+          const wy = y0 + dy * (j + sy / cnt);
+          const wz = z0 + dz * (k + sz / cnt);
+
+          // 梯度当法线(中心差分)
+          const h = Math.min(dx, dy, dz) * 0.35;
+          const gx = evalAt({ x: wx + h, y: wy, z: wz }) - evalAt({ x: wx - h, y: wy, z: wz });
+          const gy = evalAt({ x: wx, y: wy + h, z: wz }) - evalAt({ x: wx, y: wy - h, z: wz });
+          const gz = evalAt({ x: wx, y: wy, z: wz + h }) - evalAt({ x: wx, y: wy, z: wz - h });
+          const gl = Math.hypot(gx, gy, gz) || 1;
+
+          cellOf[cidx(i, j, k)] = verts.length;
+          verts.push({
+            x: (wx - cx) / ((x1 - x0) / 2 || 1),
+            y: (wz - cz) / ((z1 - z0) / 2 || 1), // 数学的 z 映射到渲染空间的"上"
+            z: (wy - cy) / ((y1 - y0) / 2 || 1), // 数学的 y 映射到渲染空间的深度
+            // 颜色参数用数学 z(高度)归一化,球面这种按高度上色好看
+            t: (wz - z0) / (z1 - z0 || 1),
+            nx: gx / gl, ny: gz / gl, nz: gy / gl,
+          });
+        }
+      }
+    }
+
+    // 每条网格棱生成一个四边形,连接共享它的 4 个格子
+    const quads = [];
+    const pushQuad = (a, b, c, d) => {
+      const ia = cellOf[cidx(a[0], a[1], a[2])];
+      const ib = cellOf[cidx(b[0], b[1], b[2])];
+      const ic = cellOf[cidx(c[0], c[1], c[2])];
+      const id = cellOf[cidx(d[0], d[1], d[2])];
+      if (ia < 0 || ib < 0 || ic < 0 || id < 0) return;
+      quads.push([ia, ib, ic, id]);
+    };
+
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        for (let k = 0; k < n; k++) {
+          const here = F[idx(i, j, k)];
+          // x 方向的棱
+          if (i + 1 < m && (here > 0) !== (F[idx(i + 1, j, k)] > 0) && j >= 1 && k >= 1) {
+            pushQuad([i, j - 1, k - 1], [i, j, k - 1], [i, j, k], [i, j - 1, k]);
+          }
+          // y 方向的棱
+          if (j + 1 < m && (here > 0) !== (F[idx(i, j + 1, k)] > 0) && i >= 1 && k >= 1) {
+            pushQuad([i - 1, j, k - 1], [i, j, k - 1], [i, j, k], [i - 1, j, k]);
+          }
+          // z 方向的棱
+          if (k + 1 < m && (here > 0) !== (F[idx(i, j, k + 1)] > 0) && i >= 1 && j >= 1) {
+            pushQuad([i - 1, j - 1, k], [i, j - 1, k], [i, j, k], [i - 1, j, k]);
+          }
+        }
+      }
+    }
+
+    return { verts, quads, grid: n };
+  }
+
+  /* ============================================================
      四、3D:投影
      ============================================================ */
 
@@ -391,6 +645,59 @@
     // 画家算法:远的先画
     quads.sort(function (p, q) { return q.depth - p.depth; });
     return quads;
+  }
+
+  /** 相机空间里的一束平行光(右上、略偏观察者),用来给曲面打光 */
+  const LIGHT_DIR = (function () {
+    const l = [0.45, 0.72, 0.53];
+    const n = Math.hypot(l[0], l[1], l[2]);
+    return [l[0] / n, l[1] / n, l[2] / n];
+  }());
+
+  /**
+   * 把隐式曲面的四边形网格投影 + 排序。
+   *
+   * 和高度场那条路(buildQuads)分开写,是为了不动已经验证过的代码。
+   * 光照的差别:这里把法线转到**相机空间**再和光照方向点乘,等于光跟着视角走,
+   * 转动球面时明暗会在表面上正确流动,而不是像贴在物体上一样跟着转。
+   */
+  function projectMeshQuads(mesh, cam, w, h, opts) {
+    const panX = (opts && opts.panX) || 0;
+    const panY = (opts && opts.panY) || 0;
+    const out = [];
+
+    for (let qi = 0; qi < mesh.quads.length; qi++) {
+      const q = mesh.quads[qi];
+      const pts = [];
+      let depth = 0;
+      let tSum = 0;
+      let light = 0;
+      let ok = true;
+
+      for (let e = 0; e < 4; e++) {
+        const v = mesh.verts[q[e]];
+        const sp = project({ x: v.x, y: v.y, z: v.z }, cam, w, h);
+        if (sp.depth <= 0.05) { ok = false; break; }
+        sp.x += panX;
+        sp.y += panY;
+        pts.push(sp);
+        depth += sp.depth;
+        tSum += v.t;
+        const nCam = rotatePoint({ x: v.nx, y: v.ny, z: v.nz }, cam);
+        light += nCam.x * LIGHT_DIR[0] + nCam.y * LIGHT_DIR[1] + nCam.z * LIGHT_DIR[2];
+      }
+      if (!ok) continue;
+
+      out.push({
+        pts,
+        depth: depth / 4,
+        light: Math.max(0.18, light / 4),
+        t: Math.max(0, Math.min(1, tSum / 4)),
+      });
+    }
+
+    out.sort((p, q) => q.depth - p.depth);
+    return out;
   }
 
   /**
@@ -537,6 +844,27 @@
       ctx.stroke();
       ctx.shadowBlur = 0;
     });
+
+    // 隐式方程 f(x,y)=0:等值线段。线段很密(每格一小段),
+    // 一次性塞进同一条路径描边,避免几千次 beginPath/stroke。
+    (state.implicitSegs || []).forEach(function (segs, ii) {
+      if (!segs || !segs.length) return;
+      var color = state.colors[(state.series.length + ii) % state.colors.length];
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      for (var s = 0; s < segs.length; s++) {
+        var a = segs[s][0];
+        var b = segs[s][1];
+        ctx.moveTo(x2p(a.x), y2p(a.y));
+        ctx.lineTo(x2p(b.x), y2p(b.y));
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    });
   }
 
   function render3D(ctx, canvas, state, theme) {
@@ -545,7 +873,10 @@
     ctx.setTransform(theme.dpr, 0, 0, theme.dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
-    var quads = buildQuads(state.surface, state.cam, w, h, state);
+    // 隐式曲面走网格那条路,显式高度场走原来的路
+    var quads = state.mesh
+      ? projectMeshQuads(state.mesh, state.cam, w, h, state)
+      : buildQuads(state.surface, state.cam, w, h, state);
 
     for (var i = 0; i < quads.length; i++) {
       var q = quads[i];
@@ -681,13 +1012,23 @@
 
     try {
       if (kind === '3d') {
-        state.surface = buildSurface(payload.expr, payload.opts);
+        if (payload.implicit) {
+          // f(x,y,z)=0 → 等值面网格
+          state.mesh = surfaceNets(compileImplicit(payload.expr, ['x', 'y', 'z']), payload.opts);
+        } else {
+          state.surface = buildSurface(payload.expr, payload.opts);
+        }
         state.cam = {
           az: -0.62, el: 0.52, dist: 3.4,
           focal: 3.4, zoom: 1,
         };
       } else {
-        state.exprs = payload.exprs;
+        state.exprs = payload.exprs || [];
+        // 隐式方程 f(x,y)=0 先编译好,缩放时重复采样不用重新解析
+        state.implicitFns = (payload.implicit || []).map(function (e) {
+          return compileImplicit(e, ['x', 'y']);
+        });
+        state.implicitSegs = [];
         state.colors = COLORS;
         var x0 = payload.opts.x[0], x1 = payload.opts.x[1];
         state.view = { x0: x0, x1: x1, y0: -1, y1: 1 };
@@ -702,11 +1043,16 @@
 
     function resample() {
       if (kind === '3d') return;
-      var data = compute2D(state.exprs, {
-        x: [state.view.x0, state.view.x1],
-        samples: 900,
+      var range = { x: [state.view.x0, state.view.x1], y: [state.view.y0, state.view.y1] };
+      if (state.exprs.length) {
+        state.series = compute2D(state.exprs, { x: range.x, samples: 900 }).series;
+      } else {
+        state.series = [];
+      }
+      // 等值线跟着视野重新采样,放大时才不会变成折线
+      state.implicitSegs = state.implicitFns.map(function (fn) {
+        return marchingSquares(fn, { x: range.x, y: range.y, nx: 170, ny: 170 });
       });
-      state.series = data.series;
     }
 
     function autoFitY() {
@@ -917,6 +1263,11 @@
     collectNames: collectNames,
     compute2D: compute2D,
     buildSurface: buildSurface,
+    marchingSquares: marchingSquares,
+    surfaceNets: surfaceNets,
+    parseEquation: parseEquation,
+    compileImplicit: compileImplicit,
+    projectMeshQuads: projectMeshQuads,
     buildQuads: buildQuads,
     applyOrbit: applyOrbit,
     project: project,
