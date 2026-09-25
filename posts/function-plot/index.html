@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>让文章里的函数图像能转起来:自己写一个 2D/3D 绘图器 | Cos-CrossのBlogger</title>
+  <meta name="description" content="现在这篇文章里的函数图像是可以交互的 —— 滚轮缩放、拖动平移,3D 的还能拖着转。这篇讲怎么做的,以及为什么最后没有用 plotly 或 three.js。">
+  <meta name="keywords" content="Cos-Cross,个人博客,编程,数学,音游,JavaScript,Python,OI,前端">
+  <meta name="author" content="Cos-Cross">
+  <meta name="theme-color" content="#07070f">
+  <link rel="canonical" href="https://cos-cross.github.io/posts/function-plot/">
+
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="让文章里的函数图像能转起来:自己写一个 2D/3D 绘图器 | Cos-CrossのBlogger">
+  <meta property="og:description" content="现在这篇文章里的函数图像是可以交互的 —— 滚轮缩放、拖动平移,3D 的还能拖着转。这篇讲怎么做的,以及为什么最后没有用 plotly 或 three.js。">
+  <meta property="og:url" content="https://cos-cross.github.io/posts/function-plot/">
+  <meta property="og:site_name" content="Cos-CrossのBlogger">
+  <meta property="og:image" content="https://cos-cross.github.io/img/avatar.jpg">
+  <meta name="twitter:card" content="summary">
+
+  <link rel="icon" type="image/png" href="/img/favicon-32.png">
+  
+  <link rel="apple-touch-icon" sizes="180x180" href="/img/apple-touch-icon.png">
+  
+  <link rel="alternate" type="application/atom+xml" title="Cos-CrossのBlogger" href="/atom.xml">
+  <link rel="stylesheet" href="/css/style.css">
+  
+<meta name="generator" content="Hexo 8.1.2"></head>
+
+<body class="page-post">
+
+  
+
+  
+  <!-- 媒体背景:视频 / 图片,来自 Wallpaper Engine 等。用 npm run wallpaper 导入 -->
+  
+  <div class="bg-media"
+       id="bg-media"
+       data-mobile="poster"
+       style="--bg-overlay: 0.62; --bg-blur: 3px; --bg-scale: 1.06; background-image: url(&#39;/media/background.jpg&#39;)"
+       aria-hidden="true">
+    
+    <video class="bg-video"
+           id="bg-video"
+           data-src="/media/background.mp4"
+           poster="/media/background.jpg"
+           muted loop playsinline preload="none"></video>
+    
+    <span class="bg-scrim"></span>
+  </div>
+  
+
+  
+  <!-- 媒体背景时保留网格线,让霓虹感不至于断掉 -->
+  <div class="bg-fx bg-fx-light" aria-hidden="true">
+    <span class="grid-lines"></span>
+  </div>
+  
+  
+  <canvas id="note-canvas" class="note-canvas" aria-hidden="true"></canvas>
+  
+
+  <div class="reading-progress" id="reading-progress" aria-hidden="true"></div>
+
+  
+<header class="site-nav" id="site-nav">
+  <div class="nav-inner">
+    <a class="brand" href="/">
+      <span class="brand-avatar-wrap">
+        <img class="brand-avatar" src="/img/avatar.jpg" alt="Cos-CrossのBlogger" width="38" height="38">
+      </span>
+      <span class="brand-text">
+        <strong>Cos-CrossのBlogger</strong>
+        <em>高中生 · 编程 / 数学 / 音游</em>
+      </span>
+    </a>
+
+    <nav class="nav-menu" id="nav-menu" aria-label="主导航">
+      
+      
+      <a class="nav-link" href="/">
+        <span>首页</span>
+      </a>
+      
+      
+      <a class="nav-link" href="/archives/">
+        <span>文章</span>
+      </a>
+      
+      
+      <a class="nav-link" href="/projects/">
+        <span>项目</span>
+      </a>
+      
+      
+      <a class="nav-link" href="/files/">
+        <span>资源</span>
+      </a>
+      
+      
+      <a class="nav-link" href="/about/">
+        <span>关于</span>
+      </a>
+      
+      <div class="nav-menu-foot">
+        
+        <a class="nav-social" href="https://github.com/cos-cross" target="_blank" rel="noopener noreferrer">GitHub</a>
+        
+        <a class="nav-social" href="https://space.bilibili.com/388480733" target="_blank" rel="noopener noreferrer">Bilibili</a>
+        
+        <a class="nav-social" href="mailto:coscross@126.com" target="_blank" rel="noopener noreferrer">邮箱</a>
+        
+      </div>
+    </nav>
+
+    <div class="nav-actions">
+      <button class="icon-btn" id="theme-toggle" type="button" aria-label="切换深浅色">
+        <svg class="ico-moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.8 6.8 0 0 0 9.8 9.8z" fill="currentColor"/></svg>
+        <svg class="ico-sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2.5a1 1 0 0 1 1 1V22a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zm0-20a1 1 0 0 1 1 1V2a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zM3.5 12a1 1 0 0 1 1-1H6a1 1 0 1 1 0 2H4.5a1 1 0 0 1-1-1zm14.5 0a1 1 0 0 1 1-1h1.5a1 1 0 1 1 0 2H19a1 1 0 0 1-1-1zM5.3 5.3a1 1 0 0 1 1.4 0l1 1a1 1 0 1 1-1.4 1.4l-1-1a1 1 0 0 1 0-1.4zm11 11a1 1 0 0 1 1.4 0l1 1a1 1 0 0 1-1.4 1.4l-1-1a1 1 0 0 1 0-1.4zm1.4-11a1 1 0 0 1 0 1.4l-1 1a1 1 0 1 1-1.4-1.4l1-1a1 1 0 0 1 1.4 0zm-11 11a1 1 0 0 1 0 1.4l-1 1a1 1 0 0 1-1.4-1.4l1-1a1 1 0 0 1 1.4 0z" fill="currentColor"/></svg>
+      </button>
+      <button class="icon-btn nav-burger" id="nav-burger" type="button" aria-label="菜单" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+
+  <main class="site-main">
+    
+
+<article class="post">
+  <header class="post-header">
+    <nav class="post-crumbs" aria-label="面包屑">
+      <a href="/">首页</a>
+      <span>/</span>
+      <a href="/archives/">文章</a>
+      <span>/</span><a class="crumb-cat" href="/categories/%E7%BC%96%E7%A8%8B/">编程</a>
+    </nav>
+
+    <h1 class="post-title">让文章里的函数图像能转起来:自己写一个 2D/3D 绘图器</h1>
+
+    <div class="post-meta">
+      <span class="meta-item">
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1zM4 10v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9z" fill="currentColor"/></svg>
+<time datetime="2026-09-25T07:30:00.000Z">2026-09-25</time></span>
+      
+      <span class="meta-item">
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm1 3v5.6l3.7 2.1-1 1.7L11 13.7V7z" fill="currentColor"/></svg>
+约 27 分钟</span>
+      
+      
+      
+      <span class="meta-item">
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 4h5.2l2 2.5H20a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="currentColor"/></svg>
+<a href="/categories/%E7%BC%96%E7%A8%8B/">编程</a></span>
+      
+    </div>
+
+    
+    <div class="post-tags">
+      
+      <a class="tag-pill" href="/tags/Canvas/"><span class="tag-hash">#</span>Canvas</a>
+      
+      <a class="tag-pill" href="/tags/%E6%95%B0%E5%AD%A6/"><span class="tag-hash">#</span>数学</a>
+      
+      <a class="tag-pill" href="/tags/%E5%8F%AF%E8%A7%86%E5%8C%96/"><span class="tag-hash">#</span>可视化</a>
+      
+      <a class="tag-pill" href="/tags/%E5%89%8D%E7%AB%AF/"><span class="tag-hash">#</span>前端</a>
+      
+    </div>
+    
+  </header>
+
+  <div class="post-layout with-toc">
+    
+    <aside class="post-toc" id="post-toc" aria-label="目录">
+      <div class="toc-card">
+        <div class="toc-title"><span class="toc-bar"></span>目录</div>
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%88%E7%9C%8B%E6%95%88%E6%9E%9C"><span class="toc-text">先看效果</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E7%94%A8%E7%8E%B0%E6%88%90%E7%9A%84%E5%BA%93"><span class="toc-text">为什么不用现成的库</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%87%A0%E4%B8%AA%E5%AE%9E%E7%8E%B0%E7%BB%86%E8%8A%82"><span class="toc-text">几个实现细节</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%8E%E4%B9%88%E7%94%A8"><span class="toc-text">怎么用</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%BF%98%E6%94%AF%E6%8C%81%E9%9A%90%E5%BC%8F%E6%96%B9%E7%A8%8B"><span class="toc-text">还支持隐式方程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%A4%E7%A7%8D%E6%96%B9%E7%A8%8B%E8%83%8C%E5%90%8E%E6%98%AF%E4%B8%A4%E5%A5%97%E5%AE%8C%E5%85%A8%E4%B8%8D%E5%90%8C%E7%9A%84%E7%AE%97%E6%B3%95"><span class="toc-text">两种方程背后是两套完全不同的算法</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%80%89%E9%A1%B9%E4%B8%8A%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="toc-text">选项上的区别</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BA%A6%E6%9D%9F%E6%9D%A1%E4%BB%B6-%E6%8A%8A%E5%9B%BE%E5%BD%A2%E8%A3%81%E6%88%90%E4%BD%A0%E6%83%B3%E8%A6%81%E7%9A%84%E9%82%A3%E4%B8%80%E5%9D%97"><span class="toc-text">约束条件:把图形裁成你想要的那一块</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8F%AA%E5%86%99%E7%BA%A6%E6%9D%9F%E6%9D%A1%E4%BB%B6-%E7%94%BB%E5%8C%BA%E5%9F%9F"><span class="toc-text">只写约束条件 &#x3D; 画区域</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BA%A6%E6%9D%9F%E6%98%AF%E6%80%8E%E4%B9%88%E5%AE%9E%E7%8E%B0%E7%9A%84"><span class="toc-text">约束是怎么实现的</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8D%95%E7%8B%AC%E7%9A%84%E7%82%B9"><span class="toc-text">单独的点</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BB%99%E6%AF%8F%E6%9D%A1%E6%9B%B2%E7%BA%BF%E5%8D%95%E7%8B%AC%E5%AE%9A%E5%88%B6%E7%BA%A6%E6%9D%9F"><span class="toc-text">给每条曲线单独定制约束</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%A8%E5%B1%80%E5%92%8C%E5%B1%80%E9%83%A8%E6%98%AF%E5%8F%A0%E5%8A%A0%E7%9A%84-%E4%B8%8D%E6%98%AF%E8%A6%86%E7%9B%96"><span class="toc-text">全局和局部是叠加的,不是覆盖</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%AF%8F%E4%B8%AA%E7%82%B9%E4%B9%9F%E5%8F%AF%E4%BB%A5%E6%9C%89%E8%87%AA%E5%B7%B1%E7%9A%84%E7%BA%A6%E6%9D%9F"><span class="toc-text">每个点也可以有自己的约束</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%A4%E4%BA%92"><span class="toc-text">交互</span></a></li></ol>
+        <div class="toc-progress"><span class="toc-progress-bar" id="toc-progress-bar"></span></div>
+      </div>
+    </aside>
+    
+
+    <div class="post-main">
+      <div class="post-content" id="post-content">
+        <p>现在这篇文章里的函数图像<strong>是可以交互的</strong> —— 滚轮缩放、拖动平移,3D 的还能拖着转。这篇讲怎么做的,以及为什么最后没有用 plotly 或 three.js。</p>
+<span id="more"></span>
+
+<h2 id="先看效果"><a href="#先看效果" class="headerlink" title="先看效果"></a>先看效果</h2><p>一条普通的三角函数,拖一下、滚一下都行:</p>
+<div class="plot" data-kind="2d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">2D · 1 条曲线</span>
+    <span class="plot-hint">滚轮缩放 · 拖动平移 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"explicit","expr":"sin(x)","constraints":[]}],"region":[],"opts":{"x":[-7,7],"y":[-2.2,2.2],"samples":900}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>sin(x)
+</pre></details>
+</div>
+
+<p>同一张图里画多条曲线,自动配不同颜色、自动适配 y 范围:</p>
+<div class="plot" data-kind="2d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">2D · 2 条曲线</span>
+    <span class="plot-hint">滚轮缩放 · 拖动平移 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"explicit","expr":"sin(x)/x","constraints":[]},{"type":"explicit","expr":"cos(x)","constraints":[]}],"region":[],"opts":{"x":[-6.5,6.5],"y":null,"samples":900}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>sin(x)/x
+cos(x)
+</pre></details>
+</div>
+
+<p>3D 的曲面麻烦一点,因为要自己算投影、自己排序。<strong>按住拖动可以转</strong>:</p>
+<div class="plot" data-kind="3d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">3D 曲面 · z = sin(sqrt(x^2+y^2))</span>
+    <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"explicit","expr":"sin(sqrt(x^2+y^2))","constraints":[]}],"opts":{"x":[-5,5],"y":[-5,5],"z":null,"grid":54}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>sin(sqrt(x^2+y^2))
+</pre></details>
+</div>
+
+<p>这个经典的高斯钟形曲面,换个角度看形状更清楚:</p>
+<div class="plot" data-kind="3d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">3D 曲面 · z = exp(-(x^2+y^2)/2)</span>
+    <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"explicit","expr":"exp(-(x^2+y^2)/2)","constraints":[]}],"opts":{"x":[-3,3],"y":[-3,3],"z":null,"grid":54}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>exp(-(x^2+y^2)/2)
+</pre></details>
+</div>
+
+<p>再来个会”打架”的:两个方向的波叠加,转起来看干涉条纹:</p>
+<div class="plot" data-kind="3d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">3D 曲面 · z = sin(x)*cos(y)</span>
+    <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"explicit","expr":"sin(x)*cos(y)","constraints":[]}],"opts":{"x":[-6,6],"y":[-6,6],"z":null,"grid":64}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>sin(x)*cos(y)
+</pre></details>
+</div>
+
+<h2 id="为什么不用现成的库"><a href="#为什么不用现成的库" class="headerlink" title="为什么不用现成的库"></a>为什么不用现成的库</h2><p>第一反应当然是引库。plotly.js 什么都有,three.js 渲染 3D 也漂亮。但算下来不划算:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>plotly.js</th>
+<th>three.js</th>
+<th>自己写</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>体积</td>
+<td>2D 约 1 MB,3D 再加 1.3 MB</td>
+<td>约 600 KB</td>
+<td><strong>约 26 KB</strong></td>
+</tr>
+<tr>
+<td>依赖</td>
+<td>无,但很大</td>
+<td>需要自己写曲面 + 控制器</td>
+<td>无</td>
+</tr>
+<tr>
+<td>国内 CDN</td>
+<td>要能访问,否则得塞进仓库</td>
+<td>同左</td>
+<td>不涉及</td>
+</tr>
+<tr>
+<td>能不能验证</td>
+<td>只能”看起来对”</td>
+<td>同左</td>
+<td><strong>数学核心可以在 Node 里跑单测</strong></td>
+</tr>
+</tbody></table>
+<p>最后一条是关键。我没法在这个环境里打开浏览器看效果,引库的话就只能靠运气;而自己写的话,表达式解析、网格生成、投影、深度排序这些都是纯函数,<strong>可以写成单元测试跑一遍</strong>(这份代码有 49 项测试)。</p>
+<p>3D 也没用 WebGL,而是 <strong>Canvas 2D + 画家算法</strong>:算出每个四边形四个顶点的屏幕坐标,按深度从远到近排序,依次填充。对 <code>z = f(x,y)</code> 这种单值高度场,画家算法几乎不会出错,而且避开了 WebGL 上下文丢失、移动端兼容这些麻烦。代价是网格密度不能太高,默认 46×46。</p>
+<h2 id="几个实现细节"><a href="#几个实现细节" class="headerlink" title="几个实现细节"></a>几个实现细节</h2><p><strong>1. 数学的 <code>^</code> 不是 JS 的 <code>^</code>。</strong> 我第一版直接把表达式编译成 JS 字符串,结果 <code>x^2</code> 被当成按位异或,<code>3^2</code> 算出来是 1 而不是 9。必须显式转成 <code>Math.pow</code>。这个 bug 是单测抓出来的 —— 肉眼根本看不出来,因为图还是”有东西”的,只是完全不对。</p>
+<p><strong>2. 旋转矩阵的顺序。</strong> 方位角必须绕”向上”的那根轴转。我第一版把竖直方向混进了水平旋转里,效果是画面在原地打滚。测试里专门验证了:绕竖轴转 90° 后,<code>x=1</code> 的点应该跑到 <code>z=-1</code>,而高度不变。</p>
+<p><strong>3. 隐式乘法。</strong> <code>2x</code>、<code>3sin(x)</code>、<code>(x+1)(x-1)</code> 都能认。写法上和显式乘法同级,所以 <code>2x^2 = 2·(x²)</code> 而不是 <code>(2x)²</code>。</p>
+<p><strong>4. 未知符号明确报错。</strong> 打错一个字母时,与其给你一张空图,不如直接说”未知符号: xx”。而且<strong>构建期就会检查一遍</strong> —— 表达式写错了,<code>npm run build</code> 的日志里当场报出来,不用等打开网页。</p>
+<p><strong>5. <code>1/x</code> 在 0 附近要断开。</strong> 非有限值处直接断开路径,否则会连出一条竖直的假线。</p>
+<h2 id="怎么用"><a href="#怎么用" class="headerlink" title="怎么用"></a>怎么用</h2><p>在文章里写一个带 <code>plot2d</code> &#x2F; <code>plot3d</code> 标记的代码块就行:</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="code">```plot2d x=[-7,7] y=[-2,2]</span></span><br><span class="line"><span class="code">sin(x)</span></span><br><span class="line"><span class="code">cos(x)</span></span><br><span class="line"><span class="code">```</span></span><br></pre></td></tr></table></figure>
+
+<p>表达式一行一个,<code>#</code> 开头的行会被忽略(可以当注释)。</p>
+<p><strong>可用选项:</strong></p>
+<table>
+<thead>
+<tr>
+<th>选项</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>x=[a,b]</code></td>
+<td>2D <code>[-10,10]</code> &#x2F; 3D <code>[-5,5]</code></td>
+<td>横轴范围</td>
+</tr>
+<tr>
+<td><code>y=[a,b]</code></td>
+<td>2D 自动适配 &#x2F; 3D <code>[-5,5]</code></td>
+<td>纵轴范围(3D 时是第二个自变量)</td>
+</tr>
+<tr>
+<td><code>z=[a,b]</code></td>
+<td>自动</td>
+<td>3D 颜色映射的高度范围</td>
+</tr>
+<tr>
+<td><code>grid=n</code></td>
+<td>46</td>
+<td>3D 网格密度,最高 90</td>
+</tr>
+<tr>
+<td><code>n=n</code></td>
+<td>900</td>
+<td>2D 采样点数</td>
+</tr>
+</tbody></table>
+<p><strong>支持的函数:</strong> <code>sin</code> <code>cos</code> <code>tan</code> <code>asin</code> <code>acos</code> <code>atan</code> <code>sinh</code> <code>cosh</code> <code>tanh</code> <code>exp</code> <code>log</code> <code>ln</code> <code>log2</code> <code>log10</code> <code>sqrt</code> <code>cbrt</code> <code>abs</code> <code>sign</code> <code>floor</code> <code>ceil</code> <code>round</code> <code>min</code> <code>max</code> <code>pow</code> <code>hypot</code> <code>mod</code> <code>clamp</code>,以及两个我自己加的 <code>sinc(x)</code> 和 <code>gauss(x, σ)</code>。常量有 <code>pi</code> <code>e</code> <code>tau</code>。</p>
+<h2 id="还支持隐式方程"><a href="#还支持隐式方程" class="headerlink" title="还支持隐式方程"></a>还支持隐式方程</h2><p>前面画的都是 <code>y = f(x)</code> 这种”显式”函数。但圆锥曲线、球面这类东西写成 <code>f(x,y)=0</code> 要自然得多,所以也支持了。</p>
+<p><strong>只要式子里有等号,就按隐式方程处理。</strong> 圆锥曲线三兄弟:</p>
+<div class="plot" data-kind="2d" data-mount data-ratio="1">
+  <div class="plot-bar">
+    <span class="plot-kind">2D · 3 个方程</span>
+    <span class="plot-hint">滚轮缩放 · 拖动平移 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 = 1","constraints":[]},{"type":"implicit","expr":"x^2/4 + y^2 = 2","constraints":[]},{"type":"implicit","expr":"x^2/2 - y^2 = 1","constraints":[]}],"region":[],"opts":{"x":[-3,3],"y":[-3,3],"samples":900}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 = 1
+x^2/4 + y^2 = 2
+x^2/2 - y^2 = 1
+</pre></details>
+</div>
+
+<p>注意画布会自动变成<strong>正方形</strong>,而且纵轴默认取和横轴一样宽 —— 不然圆会被压成椭圆。这一条很容易被忽略:隐式曲线必须横纵等比例才是它本来的形状。</p>
+<p>球面,拖一下就能看清是个球:</p>
+<div class="plot" data-kind="3d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">3D 等值面 · x^2 + y^2 + z^2 = 1</span>
+    <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":[]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":34}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 + z^2 = 1
+</pre></details>
+</div>
+
+<p>环面 —— 四次方程,<code>(x²+y²+z²+R²)² = 4R²(x²+y²)</code>:</p>
+<div class="plot" data-kind="3d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">3D 等值面 · (x^2 + y^2 + z^2 + 0.6)^2 = 4*(x^2 + y^2)</span>
+    <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"(x^2 + y^2 + z^2 + 0.6)^2 = 4*(x^2 + y^2)","constraints":[]}],"opts":{"x":[-2.4,2.4],"y":[-2.4,2.4],"z":[-2.4,2.4],"grid":36}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>(x^2 + y^2 + z^2 + 0.6)^2 = 4*(x^2 + y^2)
+</pre></details>
+</div>
+
+<p>显式和隐式还能混在同一张图里:</p>
+<div class="plot" data-kind="2d" data-mount data-ratio="1">
+  <div class="plot-bar">
+    <span class="plot-kind">2D · 1 条曲线 + 1 个方程</span>
+    <span class="plot-hint">滚轮缩放 · 拖动平移 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 = 4","constraints":[]},{"type":"explicit","expr":"sin(x)","constraints":[]}],"region":[],"opts":{"x":[-4,4],"y":[-4,4],"samples":900}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 = 4
+sin(x)
+</pre></details>
+</div>
+
+<h3 id="两种方程背后是两套完全不同的算法"><a href="#两种方程背后是两套完全不同的算法" class="headerlink" title="两种方程背后是两套完全不同的算法"></a>两种方程背后是两套完全不同的算法</h3><table>
+<thead>
+<tr>
+<th></th>
+<th>显式</th>
+<th>隐式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>2D</td>
+<td>逐点采样,连成折线</td>
+<td><strong>marching squares</strong>:在每个小格上看四角正负号,在符号变化的边上插值出交点再连起来</td>
+</tr>
+<tr>
+<td>3D</td>
+<td>生成高度场网格</td>
+<td><strong>surface nets</strong>:每个”有符号变化”的立方体格子里放一个顶点,再对每条有符号变化的网格棱拼一个四边形</td>
+</tr>
+</tbody></table>
+<p>3D 隐式这块本来该用经典的 <strong>marching cubes</strong>,但它需要一张 256 项、每项最多 16 个索引的查找表 —— 手抄这种东西错一个数字就会在某些角度冒出一块诡异的面。<strong>surface nets</strong> 不需要任何查找表,代码短得多,而且产出的正好是四边形,能直接喂给现有的画家算法渲染器。</p>
+<p>两个算法都有个容易翻车的点:</p>
+<ul>
+<li><strong>marching squares 的鞍点</strong>。一个格子里出现 4 个交点时(比如 <code>f = x·y</code> 在原点附近),必须看<strong>格子中心</strong>的正负号才能决定该”上下连”还是”左右连”。省掉这一步,双曲线在某些位置会出现莫名其妙的交叉连线。</li>
+<li><strong>surface nets 的边界</strong>。曲面如果正好贴到包围盒的面上,那一圈会缺几个面片。把范围开大一点就好。</li>
+</ul>
+<h3 id="选项上的区别"><a href="#选项上的区别" class="headerlink" title="选项上的区别"></a>选项上的区别</h3><p>隐式 3D 需要三个轴的范围,所以 <code>z=</code> 在隐式下表示<strong>第三个坐标轴</strong>,而显式下表示颜色映射的高度范围:</p>
+<div class="plot" data-kind="3d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">3D 等值面 · x^2 + y^2 + z^2 = 1</span>
+    <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":[]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":34}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 + z^2 = 1
+</pre></details>
+</div>
+
+<p><code>grid</code> 对隐式 3D 建议不要开太高(默认 28):曲面网格的四边形数量是显式高度场的好几倍,开太高拖动会掉帧。</p>
+<h2 id="约束条件-把图形裁成你想要的那一块"><a href="#约束条件-把图形裁成你想要的那一块" class="headerlink" title="约束条件:把图形裁成你想要的那一块"></a>约束条件:把图形裁成你想要的那一块</h2><p><strong>只要一行里出现 <code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code>,它就自动被当成约束条件</strong> —— 约束会裁掉其他所有图形(曲线、方程、曲面)落在区域外的部分。不需要什么新语法。</p>
+<p>上半球,一行搞定:</p>
+<div class="plot" data-kind="3d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">3D 等值面 · x^2 + y^2 + z^2 = 1 · 1 个全局约束</span>
+    <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":["z > 0"]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":34}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 + z^2 = 1
+z &gt; 0
+</pre></details>
+</div>
+
+<p>约束是组合的,写几行就叠几层。下面这个球被两个半空间同时切:</p>
+<div class="plot" data-kind="3d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">3D 等值面 · x^2 + y^2 + z^2 = 1 · 2 个全局约束</span>
+    <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":["z > 0","x + y \u003c 0"]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":32}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 + z^2 = 1
+z &gt; 0
+x + y &lt; 0
+</pre></details>
+</div>
+
+<p>2D 也一样。单位圆上 <code>x &lt; y</code> 的那段弧:</p>
+<div class="plot" data-kind="2d" data-mount data-ratio="1">
+  <div class="plot-bar">
+    <span class="plot-kind">2D · 1 个方程 + 1 个全局约束</span>
+    <span class="plot-hint">滚轮缩放 · 拖动平移 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 = 1","constraints":["x \u003c y"]}],"region":[],"opts":{"x":[-2,2],"y":[-2,2],"samples":900}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 = 1
+x &lt; y
+</pre></details>
+</div>
+
+<h3 id="只写约束条件-画区域"><a href="#只写约束条件-画区域" class="headerlink" title="只写约束条件 &#x3D; 画区域"></a>只写约束条件 &#x3D; 画区域</h3><p>如果一个 2D 代码块里<strong>只有约束条件</strong>,那就画满足条件的区域(填充 + 描边):</p>
+<div class="plot" data-kind="2d" data-mount data-ratio="1">
+  <div class="plot-bar">
+    <span class="plot-kind">2D · 区域</span>
+    <span class="plot-hint">滚轮缩放 · 拖动平移 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[],"region":["x^2 + y^2 \u003c 1"],"opts":{"x":[-2,2],"y":[-2,2],"samples":900}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 &lt; 1
+</pre></details>
+</div>
+
+<p>几个区域叠起来就是交集 —— 比如”单位圆内且第一象限”:</p>
+<div class="plot" data-kind="2d" data-mount data-ratio="1">
+  <div class="plot-bar">
+    <span class="plot-kind">2D · 区域</span>
+    <span class="plot-hint">滚轮缩放 · 拖动平移 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[],"region":["x^2 + y^2 \u003c 1","x > 0","y > 0"],"opts":{"x":[-2,2],"y":[-2,2],"samples":900}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 &lt; 1
+x &gt; 0
+y &gt; 0
+</pre></details>
+</div>
+
+<h3 id="约束是怎么实现的"><a href="#约束是怎么实现的" class="headerlink" title="约束是怎么实现的"></a>约束是怎么实现的</h3><table>
+<thead>
+<tr>
+<th>图形</th>
+<th>裁剪方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>显式 2D 曲线</td>
+<td>采样时逐点判定,不满足就<strong>断开折线</strong></td>
+</tr>
+<tr>
+<td>隐式 2D 等值线</td>
+<td>线段两端都必须满足约束才保留</td>
+</tr>
+<tr>
+<td>3D 高度场</td>
+<td>网格点标成空值,引用它的四边形自动消失</td>
+</tr>
+<tr>
+<td>3D 等值面</td>
+<td>顶点在约束外就不生成,四边形自然消失</td>
+</tr>
+<tr>
+<td>区域</td>
+<td>逐个格子判定中心是否满足,满足的格子并成一个路径一次填充</td>
+</tr>
+</tbody></table>
+<p>区域填充有个小细节:所有格子必须<strong>塞进同一条路径再 fill</strong>。如果一格一格地 fill,格子相邻处会因为两次半透明叠加而出现明显的网格接缝。</p>
+<p>内部实现上,四种比较符号统一归一化成 <code>g &gt; 0</code> &#x2F; <code>g &gt;= 0</code>(<code>a &lt; b</code> 就变成 <code>b - a &gt; 0</code>),判定逻辑只剩一个符号问题。</p>
+<blockquote>
+<p>注意比较符号的识别顺序:<code>&lt;=</code> &#x2F; <code>&gt;=</code> 必须排在 <code>&lt;</code> &#x2F; <code>&gt;</code> 前面 —— 否则 <code>x &lt;= y</code> 会被当成 <code>&lt;</code> 后面跟了个 <code>=</code>。</p>
+</blockquote>
+<h2 id="单独的点"><a href="#单独的点" class="headerlink" title="单独的点"></a>单独的点</h2><p>用 <code>point(x, y)</code> 或 <code>point(x, y, z)</code>,后面可以跟一个标签:</p>
+<div class="plot" data-kind="2d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">2D · 1 条曲线 + 3 个点</span>
+    <span class="plot-hint">滚轮缩放 · 拖动平移 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"explicit","expr":"sin(x)","constraints":[]},{"type":"point","x":0,"y":0,"z":0,"label":"O","constraints":[]},{"type":"point","x":1.5707963267948966,"y":1,"z":0,"label":"A","constraints":[]},{"type":"point","x":3.141592653589793,"y":0,"z":0,"label":"B","constraints":[]}],"region":[],"opts":{"x":[-4,4],"y":[-1.6,1.6],"samples":900}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>y = sin(x)
+point(0, 0) O
+point(pi/2, 1) A
+point(pi, 0) B
+</pre></details>
+</div>
+
+<p>坐标是<strong>常量表达式</strong>,所以 <code>pi/2</code>、<code>sqrt(2)</code> 都能直接写。点也会被约束条件管 —— 在约束外的点不会画出来:</p>
+<div class="plot" data-kind="3d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">3D 等值面 · x^2 + y^2 + z^2 = 1 · 1 个全局约束 · 4 个点</span>
+    <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":["z >= 0"]},{"type":"point","x":1,"y":0,"z":0,"label":"X","constraints":["z >= 0"]},{"type":"point","x":0,"y":1,"z":0,"label":"Y","constraints":["z >= 0"]},{"type":"point","x":0,"y":0,"z":1,"label":"Z","constraints":["z >= 0"]},{"type":"point","x":0,"y":0,"z":-1,"label":"看不见","constraints":["z >= 0"]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":30}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 + z^2 = 1
+z &gt;= 0
+point(1, 0, 0) X
+point(0, 1, 0) Y
+point(0, 0, 1) Z
+point(0, 0, -1) 看不见
+</pre></details>
+</div>
+
+<p><strong>边界上写 <code>&gt;</code> 还是 <code>&gt;=</code> 会差很多。</strong> 上面如果写成 <code>z &gt; 0</code>,虽然球面看起来差不多,但<strong>赤道上的 X 和 Y(它们的 z 正好是 0)会被一起排除掉</strong>,四个点只剩一个。曲面本身和约束的边界相交时,严格的 <code>&gt;</code> 会把整条交线切掉,<code>&gt;=</code> 才会留下。</p>
+<p><strong>3D 的点会和曲面一起按深度排序</strong>,所以球背面的点会被球正确地挡住,而不是浮在最上面。半径也随透视缩放,靠近时自然变大。</p>
+<h3 id="给每条曲线单独定制约束"><a href="#给每条曲线单独定制约束" class="headerlink" title="给每条曲线单独定制约束"></a>给每条曲线单独定制约束</h3><p>上面那种独立成行的约束是<strong>全局</strong>的,会把这张图里所有东西一起裁。但很多时候你想要的恰恰相反 —— 比如”这条只画右半边,那条只画左半边”。</p>
+<p>用 <code>where</code> 跟在这一行后面就行:</p>
+<div class="plot" data-kind="2d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">2D · 2 条曲线 + 2 条带 where</span>
+    <span class="plot-hint">滚轮缩放 · 拖动平移 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"explicit","expr":"sin(x)","constraints":["x >= 0"]},{"type":"explicit","expr":"cos(x)","constraints":["x \u003c 0"]}],"region":[],"opts":{"x":[-7,7],"y":[-1.6,1.6],"samples":900}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>y = sin(x) where x &gt;= 0
+y = cos(x) where x &lt; 0
+</pre></details>
+</div>
+
+<p>多个条件用 <code>and</code> 连接(<code>&amp;&amp;</code> 也可以):</p>
+<div class="plot" data-kind="2d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">2D · 2 条曲线 + 2 条带 where</span>
+    <span class="plot-hint">滚轮缩放 · 拖动平移 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"explicit","expr":"sin(x)","constraints":["x > -4","y > 0"]},{"type":"explicit","expr":"cos(x)","constraints":["x > 2"]}],"region":[],"opts":{"x":[-7,7],"y":[-1.6,1.6],"samples":900}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>y = sin(x) where x &gt; -4 and y &gt; 0
+y = cos(x) where x &gt; 2
+</pre></details>
+</div>
+
+<p>隐式方程、3D 曲面同样支持:</p>
+<div class="plot" data-kind="2d" data-mount data-ratio="1">
+  <div class="plot-bar">
+    <span class="plot-kind">2D · 1 条曲线 + 1 个方程 + 1 条带 where</span>
+    <span class="plot-hint">滚轮缩放 · 拖动平移 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 = 1","constraints":[]},{"type":"explicit","expr":"x","constraints":["x^2 + y^2 > 1"]}],"region":[],"opts":{"x":[-2,2],"y":[-2,2],"samples":900}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 = 1
+y = x where x^2 + y^2 &gt; 1
+</pre></details>
+</div>
+
+<div class="plot" data-kind="3d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">3D 等值面 · x^2 + y^2 + z^2 = 1 · 带 where</span>
+    <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":["z > 0"]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":34}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 + z^2 = 1 where z &gt; 0
+</pre></details>
+</div>
+
+<h3 id="全局和局部是叠加的-不是覆盖"><a href="#全局和局部是叠加的-不是覆盖" class="headerlink" title="全局和局部是叠加的,不是覆盖"></a>全局和局部是<strong>叠加</strong>的,不是覆盖</h3><p>不带 <code>where</code> 的独立约束行仍然全局生效,它会被并进每一条的约束里:</p>
+<div class="plot" data-kind="2d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">2D · 2 条曲线 + 1 个全局约束 + 1 条带 where</span>
+    <span class="plot-hint">滚轮缩放 · 拖动平移 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"explicit","expr":"sin(x)","constraints":["x >= -2","y > 0"]},{"type":"explicit","expr":"cos(x)","constraints":["x >= -2"]}],"region":[],"opts":{"x":[-4,4],"y":[-2,2],"samples":900}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x &gt;= -2
+y = sin(x) where y &gt; 0
+y = cos(x)
+</pre></details>
+</div>
+
+<p>上面这张图的实际效果是:</p>
+<table>
+<thead>
+<tr>
+<th>曲线</th>
+<th>实际生效的约束</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sin(x)</code></td>
+<td><code>x &gt;= -2</code> <strong>且</strong> <code>y &gt; 0</code></td>
+</tr>
+<tr>
+<td><code>cos(x)</code></td>
+<td><code>x &gt;= -2</code></td>
+</tr>
+</tbody></table>
+<p>也就是<strong>先按整张图的限制裁一遍,再按各自的 <code>where</code> 裁一遍</strong>。这个语义比”有 where 就无视全局”更可预测 —— 全局约束的意思是”这张图整体只看这一块”,不该被某一条曲线悄悄绕过。</p>
+<h3 id="每个点也可以有自己的约束"><a href="#每个点也可以有自己的约束" class="headerlink" title="每个点也可以有自己的约束"></a>每个点也可以有自己的约束</h3><p><code>where</code> 对点同样有效,而且标签和 <code>where</code> 可以同时写:</p>
+<div class="plot" data-kind="2d" data-mount data-ratio="1">
+  <div class="plot-bar">
+    <span class="plot-kind">2D · 1 个方程 + 2 个点</span>
+    <span class="plot-hint">滚轮缩放 · 拖动平移 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 = 4","constraints":[]},{"type":"point","x":2,"y":0,"z":0,"label":"在圆上","constraints":["x > 0"]},{"type":"point","x":-2,"y":0,"z":0,"label":"这个看不到","constraints":["x > 0"]}],"region":[],"opts":{"x":[-3,3],"y":[-3,3],"samples":900}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 = 4
+point(2, 0) 在圆上 where x &gt; 0
+point(-2, 0) 这个看不到 where x &gt; 0
+</pre></details>
+</div>
+
+<p>第二个点虽然画在 <code>x = -2</code> 的圆上,但被自己的 <code>where x &gt; 0</code> 排除了,不会出现。</p>
+<h2 id="交互"><a href="#交互" class="headerlink" title="交互"></a>交互</h2><ul>
+<li><strong>2D</strong>:滚轮缩放(以鼠标位置为锚点)、拖动平移、双击重置</li>
+<li><strong>3D</strong>:拖动旋转、滚轮缩放、双击重置</li>
+<li><strong>触屏</strong>:单指拖动、双指捏合缩放</li>
+<li>右上角有「重置」和「存为 PNG」—— 写作业要用图的话直接存下来</li>
+</ul>
+<p>绘制代码只在<strong>含图像的页面</strong>加载,其他页面完全不受影响。</p>
+
+      </div>
+
+      <footer class="post-footer">
+        <div class="post-end">
+          <span class="post-end-line"></span>
+          <span class="post-end-text">CLEARED</span>
+          <span class="post-end-line"></span>
+        </div>
+
+        
+        <nav class="post-nav" aria-label="上下篇">
+          <span class="post-nav-item is-empty"></span>
+          
+          <a class="post-nav-item next" href="/posts/%E7%94%B1%E5%8C%96%E5%AD%A6%E7%9F%A5%E8%AF%86%E7%82%B9%E6%83%B3%E5%88%B0%E7%9A%84%E6%95%B0%E5%AD%A6%E9%A2%98/">
+            <span class="post-nav-label">下一篇
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M13.2 5.6 11.8 7l4 4H4v2h11.8l-4 4 1.4 1.4L20 12z" fill="currentColor"/></svg>
+</span>
+            <span class="post-nav-title">由一个化学知识点想到的数学题 -- 立体角和球面三角形</span>
+          </a>
+          
+        </nav>
+        
+
+        <div class="post-actions">
+          <a class="btn btn-ghost btn-sm" href="/archives/">
+<svg class="ico " viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 4h5.2l2 2.5H20a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="currentColor"/></svg>
+返回文章列表</a>
+          <button class="btn btn-ghost btn-sm" id="share-btn" type="button" data-title="让文章里的函数图像能转起来:自己写一个 2D/3D 绘图器">
+<svg class="ico " viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M14 3h7v7h-2V6.4l-8.3 8.3-1.4-1.4L17.6 5H14zM5 5h6v2H6v11h11v-5h2v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="currentColor"/></svg>
+复制链接</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+</article>
+
+
+
+  </main>
+
+  
+<footer class="site-footer">
+  <div class="footer-glow" aria-hidden="true"></div>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="footer-mark"><span class="grad-text">Cos-CrossのBlogger</span></div>
+      <p class="footer-slogan">Made with Hexo · Hosted on GitHub Pages</p>
+      
+      
+      <p class="footer-days">已经坚持了 <b id="site-days">—</b> 天</p>
+      
+    </div>
+
+    <div class="footer-cols">
+      <div class="footer-col">
+        <h4>导航</h4>
+        <ul>
+          
+          <li><a href="/">首页</a></li>
+          
+          <li><a href="/archives/">文章</a></li>
+          
+          <li><a href="/projects/">项目</a></li>
+          
+          <li><a href="/files/">资源</a></li>
+          
+          <li><a href="/about/">关于</a></li>
+          
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>找到我</h4>
+        <ul>
+          
+          <li>
+            <a href="https://github.com/cos-cross" target="_blank" rel="noopener noreferrer">
+              
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.09 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.76.41-1.28.74-1.57-2.55-.29-5.23-1.28-5.23-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.43-2.69 5.4-5.25 5.69.42.36.79 1.07.79 2.16v3.2c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z" fill="currentColor"/></svg>
+GitHub
+            </a>
+          </li>
+          
+          <li>
+            <a href="https://space.bilibili.com/388480733" target="_blank" rel="noopener noreferrer">
+              
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M7.5 2.2 10 4.7h4l2.5-2.5a1 1 0 0 1 1.4 1.4L16.8 4.7h1.4A3.8 3.8 0 0 1 22 8.5v8.2a3.8 3.8 0 0 1-3.8 3.8H5.8A3.8 3.8 0 0 1 2 16.7V8.5a3.8 3.8 0 0 1 3.8-3.8h1.4L6.1 3.6a1 1 0 0 1 1.4-1.4zM5.8 6.7c-1 0-1.8.8-1.8 1.8v8.2c0 1 .8 1.8 1.8 1.8h12.4c1 0 1.8-.8 1.8-1.8V8.5c0-1-.8-1.8-1.8-1.8zM8 10a1.2 1.2 0 0 1 1.2 1.2v1.6a1.2 1.2 0 1 1-2.4 0v-1.6A1.2 1.2 0 0 1 8 10zm8 0a1.2 1.2 0 0 1 1.2 1.2v1.6a1.2 1.2 0 1 1-2.4 0v-1.6A1.2 1.2 0 0 1 16 10z" fill="currentColor"/></svg>
+Bilibili
+            </a>
+          </li>
+          
+          <li>
+            <a href="mailto:coscross@126.com" target="_blank" rel="noopener noreferrer">
+              
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M3.5 5h17A2.5 2.5 0 0 1 23 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-17A2.5 2.5 0 0 1 1 16.5v-9A2.5 2.5 0 0 1 3.5 5zm.2 2L12 12.9 20.3 7zM21 9.2l-8.4 6a1 1 0 0 1-1.2 0L3 9.2v7.3c0 .3.2.5.5.5h17c.3 0 .5-.2.5-.5z" fill="currentColor"/></svg>
+邮箱
+            </a>
+          </li>
+          
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>订阅</h4>
+        <ul>
+          <li><a href="/atom.xml">
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 19a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM3 10.5v2.6A7.9 7.9 0 0 1 10.9 21h2.6C13.5 15.2 8.8 10.5 3 10.5zM3 3v2.6C11.5 5.6 18.4 12.5 18.4 21H21C21 11.1 12.9 3 3 3z" fill="currentColor"/></svg>
+RSS / Atom</a></li>
+          <li><a href="/archives/">
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 4h5.2l2 2.5H20a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="currentColor"/></svg>
+全部文章</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    <span>© 2025–2026 Cos-CrossのBlogger</span>
+    
+    <span class="footer-sep">·</span>
+    <span>Powered by <a href="https://hexo.io" target="_blank" rel="noopener noreferrer">Hexo</a> &amp; GitHub Pages</span>
+    <span class="footer-sep">·</span>
+    <span class="footer-combo">ALL PERFECT <span class="combo-dot"></span></span>
+    
+  </div>
+  <span class="footer-since-hidden" id="site-since" data-since="2025-01-01" hidden></span>
+</footer>
+
+
+  
+  <div class="combo-hud" id="combo-hud" aria-hidden="true">
+    <span class="combo-label">COMBO</span>
+    <span class="combo-num" id="combo-num">0</span>
+    <span class="combo-judge" id="combo-judge"></span>
+  </div>
+  
+
+  
+  <button class="bg-toggle" id="bg-toggle" type="button" aria-label="暂停背景动画" title="暂停 / 播放背景动画">
+    <svg class="ico-pause" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5h3v14H8zm5 0h3v14h-3z" fill="currentColor"/></svg>
+    <svg class="ico-play" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5l11 7-11 7z" fill="currentColor"/></svg>
+  </button>
+  
+
+  <button class="to-top" id="to-top" type="button" aria-label="回到顶部">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5l7 7-1.4 1.4L13 8.8V19h-2V8.8L6.4 13.4 5 12z" fill="currentColor"/></svg>
+  </button>
+
+  <script src="/js/main.js"></script>
+  
+  <!-- 只有含函数图像的页面才加载绘图代码。
+       ?v= 是缓存版本号:payload 结构变过(加了约束和点),不带版本号的话
+       浏览器可能拿旧缓存去配新页面,图会画错甚至报错。 -->
+  <script src="/js/plot.js?v=3"></script>
+  
+</body>
+</html>

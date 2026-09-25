@@ -1,0 +1,30 @@
+博客维护命令速查
+================
+Cos-CrossのBlogger — https://cos-cross.github.io
+
+【日常写作】
+  npm run server               本地预览 http://localhost:4000
+  npm run new "文章标题"         新建一篇文章(source/_posts/)
+  把 .md 丢进 mdblog/           部署时自动变成文章,不用写 front-matter
+  把文件丢进 files/             部署时自动上架到 /files/ 下载页
+
+【发布】
+  npm run check                同步 + 构建 + 产物自检(死链/模板残留)
+  npm run deploy               同步 + 构建 + 推源码到 main + 推产物到 gh-pages
+  npm run verify               等 20~60 秒后逐页验证线上
+
+【单项操作】
+  npm run mdblog               只同步 mdblog/
+  npm run files                只同步 files/
+  npm run projects -- check    校验项目清单(会揪出私有仓库)
+  npm run projects -- list     列出公开仓库及收录状态
+  npm run avatar -- <UID>      把 B 站头像同步成网站图标
+  npm run wallpaper -- --list  列出本机 Wallpaper Engine 壁纸
+
+【文章里能用的标记】
+  围栏代码块 + exec             构建时真的执行这段代码,输出写进页面
+  $行内公式$  /  $$块级公式$$    构建期用 KaTeX 渲染,不需要任何开关
+  <!-- more -->                首页摘要截到这里
+
+【改插件后不生效?】
+  Hexo 的 db.json 渲染缓存会跳过整个过滤器链,删掉它再构建。

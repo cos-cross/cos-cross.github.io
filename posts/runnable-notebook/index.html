@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>让文章里的代码真的跑起来:构建期执行的可运行笔记 | Cos-CrossのBlogger</title>
+  <meta name="description" content="博客是纯静态的,GitHub Pages 上没有后端可以执行代码。但我还是想让文章里的代码块真的跑一遍、把结果贴在下面 —— 就像 Jupyter Notebook 那样。这篇讲讲怎么做到的,以及它和”浏览器里跑 Python”的区别。">
+  <meta name="keywords" content="Cos-Cross,个人博客,编程,数学,音游,JavaScript,Python,OI,前端">
+  <meta name="author" content="Cos-Cross">
+  <meta name="theme-color" content="#07070f">
+  <link rel="canonical" href="https://cos-cross.github.io/posts/runnable-notebook/">
+
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="让文章里的代码真的跑起来:构建期执行的可运行笔记 | Cos-CrossのBlogger">
+  <meta property="og:description" content="博客是纯静态的,GitHub Pages 上没有后端可以执行代码。但我还是想让文章里的代码块真的跑一遍、把结果贴在下面 —— 就像 Jupyter Notebook 那样。这篇讲讲怎么做到的,以及它和”浏览器里跑 Python”的区别。">
+  <meta property="og:url" content="https://cos-cross.github.io/posts/runnable-notebook/">
+  <meta property="og:site_name" content="Cos-CrossのBlogger">
+  <meta property="og:image" content="https://cos-cross.github.io/img/avatar.jpg">
+  <meta name="twitter:card" content="summary">
+
+  <link rel="icon" type="image/png" href="/img/favicon-32.png">
+  
+  <link rel="apple-touch-icon" sizes="180x180" href="/img/apple-touch-icon.png">
+  
+  <link rel="alternate" type="application/atom+xml" title="Cos-CrossのBlogger" href="/atom.xml">
+  <link rel="stylesheet" href="/css/style.css">
+  
+<meta name="generator" content="Hexo 8.1.2"></head>
+
+<body class="page-post">
+
+  
+
+  
+  <!-- 媒体背景:视频 / 图片,来自 Wallpaper Engine 等。用 npm run wallpaper 导入 -->
+  
+  <div class="bg-media"
+       id="bg-media"
+       data-mobile="poster"
+       style="--bg-overlay: 0.62; --bg-blur: 3px; --bg-scale: 1.06; background-image: url(&#39;/media/background.jpg&#39;)"
+       aria-hidden="true">
+    
+    <video class="bg-video"
+           id="bg-video"
+           data-src="/media/background.mp4"
+           poster="/media/background.jpg"
+           muted loop playsinline preload="none"></video>
+    
+    <span class="bg-scrim"></span>
+  </div>
+  
+
+  
+  <!-- 媒体背景时保留网格线,让霓虹感不至于断掉 -->
+  <div class="bg-fx bg-fx-light" aria-hidden="true">
+    <span class="grid-lines"></span>
+  </div>
+  
+  
+  <canvas id="note-canvas" class="note-canvas" aria-hidden="true"></canvas>
+  
+
+  <div class="reading-progress" id="reading-progress" aria-hidden="true"></div>
+
+  
+<header class="site-nav" id="site-nav">
+  <div class="nav-inner">
+    <a class="brand" href="/">
+      <span class="brand-avatar-wrap">
+        <img class="brand-avatar" src="/img/avatar.jpg" alt="Cos-CrossのBlogger" width="38" height="38">
+      </span>
+      <span class="brand-text">
+        <strong>Cos-CrossのBlogger</strong>
+        <em>高中生 · 编程 / 数学 / 音游</em>
+      </span>
+    </a>
+
+    <nav class="nav-menu" id="nav-menu" aria-label="主导航">
+      
+      
+      <a class="nav-link" href="/">
+        <span>首页</span>
+      </a>
+      
+      
+      <a class="nav-link" href="/archives/">
+        <span>文章</span>
+      </a>
+      
+      
+      <a class="nav-link" href="/projects/">
+        <span>项目</span>
+      </a>
+      
+      
+      <a class="nav-link" href="/files/">
+        <span>资源</span>
+      </a>
+      
+      
+      <a class="nav-link" href="/about/">
+        <span>关于</span>
+      </a>
+      
+      <div class="nav-menu-foot">
+        
+        <a class="nav-social" href="https://github.com/cos-cross" target="_blank" rel="noopener noreferrer">GitHub</a>
+        
+        <a class="nav-social" href="https://space.bilibili.com/388480733" target="_blank" rel="noopener noreferrer">Bilibili</a>
+        
+        <a class="nav-social" href="mailto:coscross@126.com" target="_blank" rel="noopener noreferrer">邮箱</a>
+        
+      </div>
+    </nav>
+
+    <div class="nav-actions">
+      <button class="icon-btn" id="theme-toggle" type="button" aria-label="切换深浅色">
+        <svg class="ico-moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.8 6.8 0 0 0 9.8 9.8z" fill="currentColor"/></svg>
+        <svg class="ico-sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2.5a1 1 0 0 1 1 1V22a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zm0-20a1 1 0 0 1 1 1V2a1 1 0 1 1-2 0v-1.5a1 1 0 0 1 1-1zM3.5 12a1 1 0 0 1 1-1H6a1 1 0 1 1 0 2H4.5a1 1 0 0 1-1-1zm14.5 0a1 1 0 0 1 1-1h1.5a1 1 0 1 1 0 2H19a1 1 0 0 1-1-1zM5.3 5.3a1 1 0 0 1 1.4 0l1 1a1 1 0 1 1-1.4 1.4l-1-1a1 1 0 0 1 0-1.4zm11 11a1 1 0 0 1 1.4 0l1 1a1 1 0 0 1-1.4 1.4l-1-1a1 1 0 0 1 0-1.4zm1.4-11a1 1 0 0 1 0 1.4l-1 1a1 1 0 1 1-1.4-1.4l1-1a1 1 0 0 1 1.4 0zm-11 11a1 1 0 0 1 0 1.4l-1 1a1 1 0 0 1-1.4-1.4l1-1a1 1 0 0 1 1.4 0z" fill="currentColor"/></svg>
+      </button>
+      <button class="icon-btn nav-burger" id="nav-burger" type="button" aria-label="菜单" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+
+  <main class="site-main">
+    
+
+<article class="post">
+  <header class="post-header">
+    <nav class="post-crumbs" aria-label="面包屑">
+      <a href="/">首页</a>
+      <span>/</span>
+      <a href="/archives/">文章</a>
+      <span>/</span><a class="crumb-cat" href="/categories/%E7%BC%96%E7%A8%8B/">编程</a>
+    </nav>
+
+    <h1 class="post-title">让文章里的代码真的跑起来:构建期执行的可运行笔记</h1>
+
+    <div class="post-meta">
+      <span class="meta-item">
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1zM4 10v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9z" fill="currentColor"/></svg>
+<time datetime="2026-09-25T03:30:00.000Z">2026-09-25</time></span>
+      
+      <span class="meta-item">
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm1 3v5.6l3.7 2.1-1 1.7L11 13.7V7z" fill="currentColor"/></svg>
+约 10 分钟</span>
+      
+      
+      
+      <span class="meta-item">
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 4h5.2l2 2.5H20a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="currentColor"/></svg>
+<a href="/categories/%E7%BC%96%E7%A8%8B/">编程</a></span>
+      
+    </div>
+
+    
+    <div class="post-tags">
+      
+      <a class="tag-pill" href="/tags/Hexo/"><span class="tag-hash">#</span>Hexo</a>
+      
+      <a class="tag-pill" href="/tags/Python/"><span class="tag-hash">#</span>Python</a>
+      
+      <a class="tag-pill" href="/tags/%E5%B7%A5%E5%85%B7%E9%93%BE/"><span class="tag-hash">#</span>工具链</a>
+      
+      <a class="tag-pill" href="/tags/%E5%8D%9A%E5%AE%A2/"><span class="tag-hash">#</span>博客</a>
+      
+    </div>
+    
+  </header>
+
+  <div class="post-layout with-toc">
+    
+    <aside class="post-toc" id="post-toc" aria-label="目录">
+      <div class="toc-card">
+        <div class="toc-title"><span class="toc-bar"></span>目录</div>
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%81%9A%E6%B3%95-%E5%9C%A8%E6%9E%84%E5%BB%BA%E6%9C%9F%E6%89%A7%E8%A1%8C"><span class="toc-text">做法:在构建期执行</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%8E%E4%B9%88%E5%86%99"><span class="toc-text">怎么写</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%83%E4%B8%8D%E6%98%AF%E5%8F%AA%E8%83%BD%E6%89%93%E5%8D%B0"><span class="toc-text">它不是只能打印</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%88%AB%E7%9A%84%E8%AF%AD%E8%A8%80%E4%B9%9F%E8%A1%8C"><span class="toc-text">别的语言也行</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%8A%A5%E9%94%99%E4%B9%9F%E4%BC%9A%E5%A6%82%E5%AE%9E%E6%98%BE%E7%A4%BA"><span class="toc-text">报错也会如实显示</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E4%BA%9B%E5%B7%A5%E7%A8%8B%E4%B8%8A%E7%9A%84%E7%BB%86%E8%8A%82"><span class="toc-text">一些工程上的细节</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%82%A3%E2%80%9D%E8%AF%BB%E8%80%85%E8%87%AA%E5%B7%B1%E8%B7%91%E2%80%9D%E5%91%A2"><span class="toc-text">那”读者自己跑”呢?</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B0%8F%E7%BB%93"><span class="toc-text">小结</span></a></li></ol>
+        <div class="toc-progress"><span class="toc-progress-bar" id="toc-progress-bar"></span></div>
+      </div>
+    </aside>
+    
+
+    <div class="post-main">
+      <div class="post-content" id="post-content">
+        <p>博客是纯静态的,GitHub Pages 上没有后端可以执行代码。但我还是想让文章里的代码块<strong>真的跑一遍、把结果贴在下面</strong> —— 就像 Jupyter Notebook 那样。这篇讲讲怎么做到的,以及它和”浏览器里跑 Python”的区别。</p>
+<span id="more"></span>
+
+<h2 id="做法-在构建期执行"><a href="#做法-在构建期执行" class="headerlink" title="做法:在构建期执行"></a>做法:在构建期执行</h2><p>思路很直接:<strong>渲染文章的时候,把带标记的代码块拿去真的跑一次,把 stdout&#x2F;stderr 一起写进 HTML。</strong></p>
+<p>所以读者看到的是已经算好的结果 —— 打开就有,不需要等任何东西加载,也不需要装 Python。这和 <code>jupyter nbconvert</code> 导出 HTML 是同一个思路:notebook 在本地跑,输出被固化进文档。</p>
+<p>代价是输出是”死”的:读者不能改参数重跑。后面会讲什么时候值得上浏览器里跑。</p>
+<h2 id="怎么写"><a href="#怎么写" class="headerlink" title="怎么写"></a>怎么写</h2><p>在代码围栏的 info 串里加一个 <code>exec</code> 标记就行:</p>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="code">```python exec</span></span><br><span class="line"><span class="code">print(2 ** 10)</span></span><br><span class="line"><span class="code">```</span></span><br></pre></td></tr></table></figure>
+
+<p>渲染出来是这样:</p>
+<div class="nb-cell" data-lang="python">
+<div class="nb-bar">
+<span class="nb-lang">Python</span>
+<span class="nb-meta">构建时运行 · 35 ms</span>
+<span class="nb-status is-ok">已完成</span>
+<button class="nb-copy" type="button">复制代码</button>
+</div>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">print</span>(<span class="number">2</span> ** <span class="number">10</span>)</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<div class="nb-out">
+<div class="nb-out-head"><span class="nb-out-label">Out[1]</span></div>
+<pre class="nb-out-body">1024</pre>
+</div>
+</div>
+
+<p>不需要输出的时候(比如只想起个展示作用),把 <code>exec</code> 去掉,它就是一个普通的高亮代码块:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">print</span>(<span class="number">2</span> ** <span class="number">10</span>)</span><br></pre></td></tr></table></figure>
+
+<h2 id="它不是只能打印"><a href="#它不是只能打印" class="headerlink" title="它不是只能打印"></a>它不是只能打印</h2><p>因为是真的在执行,画图、算数值、跑算法都可以。比如算一下前 20 个斐波那契数的比值,看看收敛到黄金分割有多快:</p>
+<div class="nb-cell" data-lang="python">
+<div class="nb-bar">
+<span class="nb-lang">Python</span>
+<span class="nb-meta">构建时运行 · 29 ms</span>
+<span class="nb-status is-ok">已完成</span>
+<button class="nb-copy" type="button">复制代码</button>
+</div>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">fib = [<span class="number">1</span>, <span class="number">1</span>]</span><br><span class="line"><span class="keyword">while</span> <span class="built_in">len</span>(fib) &lt; <span class="number">22</span>:</span><br><span class="line">    fib.append(fib[-<span class="number">1</span>] + fib[-<span class="number">2</span>])</span><br><span class="line"></span><br><span class="line">phi = (<span class="number">1</span> + <span class="number">5</span> ** <span class="number">0.5</span>) / <span class="number">2</span></span><br><span class="line"><span class="built_in">print</span>(<span class="string">f&quot;真实值 φ = <span class="subst">{phi:<span class="number">.10</span>f}</span>&quot;</span>)</span><br><span class="line"><span class="built_in">print</span>()</span><br><span class="line"><span class="keyword">for</span> n <span class="keyword">in</span> (<span class="number">5</span>, <span class="number">10</span>, <span class="number">15</span>, <span class="number">21</span>):</span><br><span class="line">    ratio = fib[n] / fib[n - <span class="number">1</span>]</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">f&quot;F(<span class="subst">{n:&gt;<span class="number">2</span>}</span>)/F(<span class="subst">{n-<span class="number">1</span>:&gt;<span class="number">2</span>}</span>) = <span class="subst">{ratio:<span class="number">.10</span>f}</span>   误差 <span class="subst">{<span class="built_in">abs</span>(ratio - phi):<span class="number">.2</span>e}</span>&quot;</span>)</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<div class="nb-out">
+<div class="nb-out-head"><span class="nb-out-label">Out[2]</span></div>
+<pre class="nb-out-body">真实值 φ = 1.6180339887
+
+F( 5)/F( 4) = 1.6000000000   误差 1.80e-02
+F(10)/F( 9) = 1.6181818182   误差 1.48e-04
+F(15)/F(14) = 1.6180327869   误差 1.20e-06
+F(21)/F(20) = 1.6180339850   误差 3.73e-09</pre>
+</div>
+</div>
+
+<p>试试更贴近日常的:验证一下”音游判定误差服从正态分布”那个模型里的几个数字到底是多少。</p>
+<div class="nb-cell" data-lang="python">
+<div class="nb-bar">
+<span class="nb-lang">Python</span>
+<span class="nb-meta">构建时运行 · 23 ms</span>
+<span class="nb-status is-ok">已完成</span>
+<button class="nb-copy" type="button">复制代码</button>
+</div>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> math</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">perfect_rate</span>(<span class="params">p, sigma, mu=<span class="number">0.0</span></span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;p: PERFECT 窗口半宽(ms); sigma: 点击误差标准差; mu: 系统性偏移&quot;&quot;&quot;</span></span><br><span class="line">    Phi = <span class="keyword">lambda</span> z: <span class="number">0.5</span> * (<span class="number">1</span> + math.erf(z / math.sqrt(<span class="number">2</span>)))</span><br><span class="line">    <span class="keyword">return</span> Phi((p - mu) / sigma) - Phi((-p - mu) / sigma)</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;窗口 ±25ms 时,不同手感的 PERFECT 率:&quot;</span>)</span><br><span class="line"><span class="keyword">for</span> sigma <span class="keyword">in</span> (<span class="number">10</span>, <span class="number">15</span>, <span class="number">20</span>, <span class="number">25</span>, <span class="number">30</span>):</span><br><span class="line">    bar = <span class="string">&quot;█&quot;</span> * <span class="built_in">round</span>(perfect_rate(<span class="number">25</span>, sigma) * <span class="number">40</span>)</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">f&quot;  σ=<span class="subst">{sigma:&gt;<span class="number">2</span>}</span>ms  <span class="subst">{perfect_rate(<span class="number">25</span>, sigma):<span class="number">6.1</span>%}</span>  <span class="subst">{bar}</span>&quot;</span>)</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<div class="nb-out">
+<div class="nb-out-head"><span class="nb-out-label">Out[3]</span></div>
+<pre class="nb-out-body">窗口 ±25ms 时,不同手感的 PERFECT 率:
+  σ=10ms   98.8%  ████████████████████████████████████████
+  σ=15ms   90.4%  ████████████████████████████████████
+  σ=20ms   78.9%  ████████████████████████████████
+  σ=25ms   68.3%  ███████████████████████████
+  σ=30ms   59.5%  ████████████████████████</pre>
+</div>
+</div>
+
+<p>输出里的 <code>█</code> 是纯文本画的条形图 —— 不需要图表库,<code>print</code> 就够了。</p>
+<h2 id="别的语言也行"><a href="#别的语言也行" class="headerlink" title="别的语言也行"></a>别的语言也行</h2><p><code>exec</code> 不限于 Python。下面是真正的 Node.js 在跑:</p>
+<div class="nb-cell" data-lang="node">
+<div class="nb-bar">
+<span class="nb-lang">Node.js</span>
+<span class="nb-meta">构建时运行 · 66 ms</span>
+<span class="nb-status is-ok">已完成</span>
+<button class="nb-copy" type="button">复制代码</button>
+</div>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> langs = [<span class="string">&#x27;JavaScript&#x27;</span>, <span class="string">&#x27;Python&#x27;</span>, <span class="string">&#x27;Kotlin&#x27;</span>, <span class="string">&#x27;C++&#x27;</span>];</span><br><span class="line"><span class="keyword">const</span> <span class="title function_">shout</span> = (<span class="params">s</span>) =&gt; s.<span class="title function_">toUpperCase</span>();</span><br><span class="line"></span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&#x27;我会的语言:&#x27;</span>);</span><br><span class="line"><span class="keyword">for</span> (<span class="keyword">const</span> [i, lang] <span class="keyword">of</span> langs.<span class="title function_">entries</span>()) {</span><br><span class="line">  <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">`  <span class="subst">${i + <span class="number">1</span>}</span>. <span class="subst">${shout(lang)}</span>  (<span class="subst">${lang.length}</span> 个字符)`</span>);</span><br><span class="line">}</span><br><span class="line"></span><br><span class="line"><span class="comment">// Node 里也能做点数学</span></span><br><span class="line"><span class="keyword">const</span> <span class="title function_">gcd</span> = (<span class="params">a, b</span>) =&gt; (b === <span class="number">0</span> ? a : <span class="title function_">gcd</span>(b, a % b));</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&#x27;\ngcd(1071, 462) =&#x27;</span>, <span class="title function_">gcd</span>(<span class="number">1071</span>, <span class="number">462</span>));</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<div class="nb-out">
+<div class="nb-out-head"><span class="nb-out-label">Out[4]</span></div>
+<pre class="nb-out-body">我会的语言:
+  1. JAVASCRIPT  (10 个字符)
+  2. PYTHON  (6 个字符)
+  3. KOTLIN  (6 个字符)
+  4. C++  (3 个字符)
+
+gcd(1071, 462) = 21</pre>
+</div>
+</div>
+
+<h2 id="报错也会如实显示"><a href="#报错也会如实显示" class="headerlink" title="报错也会如实显示"></a>报错也会如实显示</h2><p>这是它比”贴一张截图”好的地方:<strong>代码错了,页面就会显示真实的 traceback</strong>,而不是我手抄的一段。故意写一段会崩的代码:</p>
+<div class="nb-cell" data-lang="python">
+<div class="nb-bar">
+<span class="nb-lang">Python</span>
+<span class="nb-meta">构建时运行 · 49 ms</span>
+<span class="nb-status is-error">出错</span>
+<button class="nb-copy" type="button">复制代码</button>
+</div>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">data = {<span class="string">&#x27;a&#x27;</span>: <span class="number">1</span>}</span><br><span class="line"><span class="built_in">print</span>(data[<span class="string">&#x27;b&#x27;</span>])</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<div class="nb-out">
+<div class="nb-out-head"><span class="nb-out-label">Out[5]</span></div>
+<pre class="nb-out-body is-stderr">Traceback (most recent call last):
+  File &quot;cell.py&quot;, line 2, in &lt;module&gt;
+    print(data['b'])
+          ~~~~^^^^^
+KeyError: 'b'</pre>
+</div>
+</div>
+
+<p>stderr 会以红底显示在输出区,退出码也记着。所以如果你想验证文章里的例子确实能跑,把它标成 <code>exec</code> 就是最诚实的做法 —— 跑不过去,页面自己会暴露。</p>
+<h2 id="一些工程上的细节"><a href="#一些工程上的细节" class="headerlink" title="一些工程上的细节"></a>一些工程上的细节</h2><p><strong>1. 输出会缓存。</strong> 每格的缓存键是 <code>语言 + 代码内容</code> 的哈希,没改过的格子重新构建时直接复用,不会重复执行:</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">notebook: 本次执行 2 格,命中缓存 3 格</span><br></pre></td></tr></table></figure>
+
+<p><strong>2. 子进程的输出重定向到文件,而不是管道。</strong> 这是踩过的坑:受限环境下命名管道会被拦,重定向到文件在沙箱和普通终端里都能跑。</p>
+<p><strong>3. 强制 UTF-8。</strong> Windows 上 Python 默认用 GBK 编码 stdout,不加 <code>PYTHONIOENCODING=utf-8</code> 的话中文输出全是乱码。</p>
+<p><strong>4. 超时保护。</strong> 单格默认 20 秒,写了个死循环也不会把构建卡死,页面会显示”执行超时”。</p>
+<h2 id="那”读者自己跑”呢"><a href="#那”读者自己跑”呢" class="headerlink" title="那”读者自己跑”呢?"></a>那”读者自己跑”呢?</h2><p>构建期执行解决的是”<strong>看到</strong>结果”,解决不了”<strong>改</strong>参数再跑”。</p>
+<p>真要让读者在浏览器里执行,唯一的路子是把 CPython 编译成 WebAssembly —— 也就是 <strong>Pyodide</strong>。它的取舍很明确:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>构建期执行(当前方案)</th>
+<th>Pyodide(浏览器内执行)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>读者要下载</td>
+<td>0</td>
+<td>首次约 10~20 MB</td>
+</tr>
+<tr>
+<td>能否改代码重跑</td>
+<td>不能</td>
+<td>能</td>
+</tr>
+<tr>
+<td>依赖</td>
+<td>构建机装好解释器</td>
+<td>读者的浏览器</td>
+</tr>
+<tr>
+<td>国内网络</td>
+<td>无影响</td>
+<td>需要能访问 CDN,或者自己托管</td>
+</tr>
+</tbody></table>
+<p>对一个博客来说,90% 的场景其实只需要”看到真实输出”。真要上 Pyodide,也应该做成<strong>点按钮才加载</strong> —— 让不想跑的人零成本,想跑的人等十几秒。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><ul>
+<li>代码围栏加 <code>exec</code>,构建时真跑,输出写进页面;</li>
+<li>支持 Python &#x2F; Node &#x2F; PowerShell &#x2F; Bash 等,靠 <code>_config.yml</code> 里的 <code>runners</code> 配置;</li>
+<li>结果缓存、超时保护、错误如实展示;</li>
+<li>想要交互式执行,再考虑 Pyodide,并且一定要做成懒加载。</li>
+</ul>
+
+      </div>
+
+      <footer class="post-footer">
+        <div class="post-end">
+          <span class="post-end-line"></span>
+          <span class="post-end-text">CLEARED</span>
+          <span class="post-end-line"></span>
+        </div>
+
+        
+        <nav class="post-nav" aria-label="上下篇">
+          
+          <a class="post-nav-item prev" href="/posts/%E7%94%B1%E5%8C%96%E5%AD%A6%E7%9F%A5%E8%AF%86%E7%82%B9%E6%83%B3%E5%88%B0%E7%9A%84%E6%95%B0%E5%AD%A6%E9%A2%98/">
+            <span class="post-nav-label">
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M10.8 18.4 12.2 17l-4-4H20v-2H8.2l4-4-1.4-1.4L4 12z" fill="currentColor"/></svg>
+上一篇</span>
+            <span class="post-nav-title">由一个化学知识点想到的数学题 -- 立体角和球面三角形</span>
+          </a>
+          
+          <span class="post-nav-item is-empty"></span>
+        </nav>
+        
+
+        <div class="post-actions">
+          <a class="btn btn-ghost btn-sm" href="/archives/">
+<svg class="ico " viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 4h5.2l2 2.5H20a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="currentColor"/></svg>
+返回文章列表</a>
+          <button class="btn btn-ghost btn-sm" id="share-btn" type="button" data-title="让文章里的代码真的跑起来:构建期执行的可运行笔记">
+<svg class="ico " viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M14 3h7v7h-2V6.4l-8.3 8.3-1.4-1.4L17.6 5H14zM5 5h6v2H6v11h11v-5h2v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="currentColor"/></svg>
+复制链接</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+</article>
+
+
+
+  </main>
+
+  
+<footer class="site-footer">
+  <div class="footer-glow" aria-hidden="true"></div>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="footer-mark"><span class="grad-text">Cos-CrossのBlogger</span></div>
+      <p class="footer-slogan">Made with Hexo · Hosted on GitHub Pages</p>
+      
+      
+      <p class="footer-days">已经坚持了 <b id="site-days">—</b> 天</p>
+      
+    </div>
+
+    <div class="footer-cols">
+      <div class="footer-col">
+        <h4>导航</h4>
+        <ul>
+          
+          <li><a href="/">首页</a></li>
+          
+          <li><a href="/archives/">文章</a></li>
+          
+          <li><a href="/projects/">项目</a></li>
+          
+          <li><a href="/files/">资源</a></li>
+          
+          <li><a href="/about/">关于</a></li>
+          
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>找到我</h4>
+        <ul>
+          
+          <li>
+            <a href="https://github.com/cos-cross" target="_blank" rel="noopener noreferrer">
+              
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.09 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.76.41-1.28.74-1.57-2.55-.29-5.23-1.28-5.23-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.43-2.69 5.4-5.25 5.69.42.36.79 1.07.79 2.16v3.2c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z" fill="currentColor"/></svg>
+GitHub
+            </a>
+          </li>
+          
+          <li>
+            <a href="https://space.bilibili.com/388480733" target="_blank" rel="noopener noreferrer">
+              
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M7.5 2.2 10 4.7h4l2.5-2.5a1 1 0 0 1 1.4 1.4L16.8 4.7h1.4A3.8 3.8 0 0 1 22 8.5v8.2a3.8 3.8 0 0 1-3.8 3.8H5.8A3.8 3.8 0 0 1 2 16.7V8.5a3.8 3.8 0 0 1 3.8-3.8h1.4L6.1 3.6a1 1 0 0 1 1.4-1.4zM5.8 6.7c-1 0-1.8.8-1.8 1.8v8.2c0 1 .8 1.8 1.8 1.8h12.4c1 0 1.8-.8 1.8-1.8V8.5c0-1-.8-1.8-1.8-1.8zM8 10a1.2 1.2 0 0 1 1.2 1.2v1.6a1.2 1.2 0 1 1-2.4 0v-1.6A1.2 1.2 0 0 1 8 10zm8 0a1.2 1.2 0 0 1 1.2 1.2v1.6a1.2 1.2 0 1 1-2.4 0v-1.6A1.2 1.2 0 0 1 16 10z" fill="currentColor"/></svg>
+Bilibili
+            </a>
+          </li>
+          
+          <li>
+            <a href="mailto:coscross@126.com" target="_blank" rel="noopener noreferrer">
+              
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M3.5 5h17A2.5 2.5 0 0 1 23 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-17A2.5 2.5 0 0 1 1 16.5v-9A2.5 2.5 0 0 1 3.5 5zm.2 2L12 12.9 20.3 7zM21 9.2l-8.4 6a1 1 0 0 1-1.2 0L3 9.2v7.3c0 .3.2.5.5.5h17c.3 0 .5-.2.5-.5z" fill="currentColor"/></svg>
+邮箱
+            </a>
+          </li>
+          
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>订阅</h4>
+        <ul>
+          <li><a href="/atom.xml">
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 19a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM3 10.5v2.6A7.9 7.9 0 0 1 10.9 21h2.6C13.5 15.2 8.8 10.5 3 10.5zM3 3v2.6C11.5 5.6 18.4 12.5 18.4 21H21C21 11.1 12.9 3 3 3z" fill="currentColor"/></svg>
+RSS / Atom</a></li>
+          <li><a href="/archives/">
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 4h5.2l2 2.5H20a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="currentColor"/></svg>
+全部文章</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    <span>© 2025–2026 Cos-CrossのBlogger</span>
+    
+    <span class="footer-sep">·</span>
+    <span>Powered by <a href="https://hexo.io" target="_blank" rel="noopener noreferrer">Hexo</a> &amp; GitHub Pages</span>
+    <span class="footer-sep">·</span>
+    <span class="footer-combo">ALL PERFECT <span class="combo-dot"></span></span>
+    
+  </div>
+  <span class="footer-since-hidden" id="site-since" data-since="2025-01-01" hidden></span>
+</footer>
+
+
+  
+  <div class="combo-hud" id="combo-hud" aria-hidden="true">
+    <span class="combo-label">COMBO</span>
+    <span class="combo-num" id="combo-num">0</span>
+    <span class="combo-judge" id="combo-judge"></span>
+  </div>
+  
+
+  
+  <button class="bg-toggle" id="bg-toggle" type="button" aria-label="暂停背景动画" title="暂停 / 播放背景动画">
+    <svg class="ico-pause" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5h3v14H8zm5 0h3v14h-3z" fill="currentColor"/></svg>
+    <svg class="ico-play" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M8 5l11 7-11 7z" fill="currentColor"/></svg>
+  </button>
+  
+
+  <button class="to-top" id="to-top" type="button" aria-label="回到顶部">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5l7 7-1.4 1.4L13 8.8V19h-2V8.8L6.4 13.4 5 12z" fill="currentColor"/></svg>
+  </button>
+
+  <script src="/js/main.js"></script>
+  
+</body>
+</html>
