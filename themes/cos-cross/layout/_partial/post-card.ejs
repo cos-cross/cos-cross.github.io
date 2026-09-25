@@ -2,8 +2,8 @@
   var plain = strip_html(post.content || '').replace(/\s+/g, '');
   var readMin = Math.max(1, Math.ceil(plain.length / 350));
   var excerptText = post.excerpt
-    ? truncate(strip_html(post.excerpt), 96)
-    : truncate(strip_html(post.content || ''), 96);
+    ? truncate(strip_html(post.excerpt), { length: 96 })
+    : truncate(strip_html(post.content || ''), { length: 96 });
   var postCats = post.categories && post.categories.length ? post.categories.toArray() : [];
   var postTags = post.tags && post.tags.length ? post.tags.toArray() : [];
 %>
