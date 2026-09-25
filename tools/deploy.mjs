@@ -126,6 +126,10 @@ if (skipSource) {
 
 // 告诉 GitHub 不要再用 Jekyll 处理一遍产物
 writeFileSync(path.join(publicDir, '.nojekyll'), '');
+// 关键:禁止 git 对这个仓库里的文件做换行符转换。
+// 否则 autocrlf / text=auto 会把 CRLF 改成 LF,线上文件字节和本地不一致 ——
+// 下载页上标的 sha256 就对不上了,校验功能变成假的。
+writeFileSync(path.join(publicDir, '.gitattributes'), '* -text\n');
 
 console.log(`\n[2/2] 发布站点到 ${BRANCH} 分支 …`);
 const gitPub = (args, extra = []) => gitRun(args, extra, publicDir);
