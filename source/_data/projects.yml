@@ -28,7 +28,7 @@
 # ============================================================
 
 - name: IdealizedPreviewer
-  desc: 我的个人工具箱,收录了一些自己写的小工具和零散代码。
+  desc: 工具箱?
   lang: JavaScript
   link: https://cos-cross.github.io/IdealizedPreviewer/
   repo: https://github.com/cos-cross/IdealizedPreviewer
@@ -38,7 +38,7 @@
   group: 在线工具
 
 - name: GuessLetter
-  desc: 音游开字母网站,给开字母出题人用的在线工具。
+  desc: 烂尾的开字母网站,后来在IdealizedPreviewer中又做了一个(好像效果还是有点差强人意)
   lang: HTML
   link: https://cos-cross.github.io/GuessLetter/
   repo: https://github.com/cos-cross/GuessLetter
@@ -48,7 +48,7 @@
   group: 在线工具
 
 - name: AutoLetter
-  desc: 半自动化音游开字母机器,让出题人能更方便快捷地创建开字母题目。
+  desc: 半自动化音游开字母机器,让出题人能更方便快捷地创建开字母题目。(可惜是CLI)
   lang: Python
   link: ''
   repo: https://github.com/cos-cross/AutoLetter
@@ -58,7 +58,7 @@
   group: 音游相关
 
 - name: CWMathConsole
-  desc: 一个简单的数学计算控制台。
+  desc: 一个简单的数学计算控制台。(还是CLI)
   lang: Python
   link: ''
   repo: https://github.com/cos-cross/CWMathConsole
@@ -78,7 +78,7 @@
   group: 数学 / 学习
 
 - name: FinalShellActivator
-  desc: 一个用于激活 FinalShell 的小工具。
+  desc: 一个用于激活 FinalShell 的小工具。(没打包qwq)
   lang: Kotlin
   link: ''
   repo: https://github.com/cos-cross/FinalShellActivator

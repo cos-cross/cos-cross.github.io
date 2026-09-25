@@ -1,6 +1,6 @@
-# Cos-Cross 的个人博客
+# Cos-Cross 的 个人博客
 
-> 编程 · 数学 · 音游 —— 把灵感写成代码,把热爱打成 PERFECT。
+> OI · MO · Rhythm Game —— 把灵感写成代码,把热爱打成 PERFECT。
 
 线上地址:**https://cos-cross.github.io**
 
