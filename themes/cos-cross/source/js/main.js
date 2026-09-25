@@ -469,6 +469,44 @@
      公式已经在构建期由 scripts/math.js 用 KaTeX 渲染成静态 HTML,
      前端不需要再做任何事(也因此省掉了 266 KB 的 KaTeX 脚本下载)。 */
 
+  /* ---------- 12.1 资源下载页:文件名筛选 ---------- */
+  (function fileFilter() {
+    var input = $('#file-filter');
+    var countEl = $('#file-count');
+    var emptyEl = $('#file-empty');
+    if (!input) return;
+
+    var items = $$('.file-item');
+    var groups = $$('[data-group]');
+
+    function total() {
+      return items.reduce(function (s, el) { return s + (el.hidden ? 0 : 1); }, 0);
+    }
+
+    function update() {
+      var q = input.value.trim().toLowerCase();
+      items.forEach(function (el) {
+        var hit = !q || (el.getAttribute('data-name') || '').indexOf(q) !== -1;
+        el.hidden = !hit;
+      });
+      // 整个分组都没命中就藏掉分组标题
+      groups.forEach(function (g) {
+        var visible = $$('.file-item', g).some(function (el) { return !el.hidden; });
+        g.hidden = !visible;
+      });
+      var n = total();
+      if (countEl) countEl.textContent = q ? `匹配 ${n} / ${items.length} 个` : `共 ${items.length} 个`;
+      if (emptyEl) emptyEl.hidden = n !== 0;
+    }
+
+    input.addEventListener('input', update);
+    // 按 Esc 清空
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { input.value = ''; update(); }
+    });
+    update();
+  })();
+
   /* ---------- 12. 外部链接加标识 ---------- */
   (function external() {
     $$('.post-content a[href^="http"]').forEach(function (a) {

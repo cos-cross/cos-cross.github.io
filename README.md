@@ -24,6 +24,9 @@
 ├── mdblog/                   # 随手写的笔记放这里,部署时自动变成文章
 │   ├── _说明.md              # 以下划线开头 → 同步时跳过
 │   └── 数学/fibonacci-golden-ratio.md
+├── files/                    # 要分享的文件放这里,部署时自动上架到 /files/
+│   ├── _说明.md              # 以下划线开头 → 同步时跳过
+│   └── 博客维护/命令速查.txt
 ├── source/
 │   ├── _posts/               # 文章:手写的 + mdblog/ 生成的都在这里
 │   ├── _data/projects.yml    # 项目清单,首页和 /projects/ 都读它
@@ -51,6 +54,7 @@
 │   ├── check.mjs             # 构建产物自检
 │   ├── verify-live.mjs       # 线上站点验证
 │   ├── sync-mdblog.mjs       # mdblog/ → source/_posts/ 同步
+│   ├── sync-files.mjs        # files/ → source/files/ 同步并生成下载页数据
 │   ├── import-wallpaper.mjs  # 从 Wallpaper Engine 导入壁纸当背景
 │   ├── import-avatar.mjs     # 从 B 站同步头像 / 网站图标
 │   ├── manage-projects.mjs   # 项目清单校验与生成
@@ -85,6 +89,7 @@ npm install --ignore-scripts
 | `npm run wallpaper -- 2903241954` | 从 Wallpaper Engine 导入壁纸当背景 |
 | `npm run wallpaper -- --list` | 列出本机所有 Wallpaper Engine 壁纸 |
 | `npm run mdblog` | 把 `mdblog/` 里的笔记同步成文章 |
+| `npm run files` | 把 `files/` 里的文件同步上架到 `/files/` |
 | `npm run projects -- check` | 校验项目清单(揪出私有仓库) |
 | `npm run projects -- list` | 列出所有公开仓库及收录状态 |
 | `npm run projects -- add <仓库名>` | 从 GitHub 生成一条项目清单骨架 |
@@ -488,6 +493,55 @@ $$
 | 公式语法写错 | 渲染成红色错误标记,构建不中断,日志里报数 |
 
 一个仍然存在的坑:**公式里的下划线会被 Markdown 当成斜体**。写 `\sigma_x` 请改成 `\sigma`,或者用 `\sigma_{x}` 之外的方式绕开。这是 Markdown 与数学混排的经典问题,和渲染方式无关。
+
+## 文件下载区:`files/` 文件夹
+
+把要分享的文件丢进 `files/`,部署后自动上架到 **`/files/`** 下载页:
+
+```bash
+npm run files                # 只同步
+npm run files -- --dry-run   # 只看会做什么
+npm run deploy               # 同步 + 构建 + 发布
+```
+
+```text
+files/
+├── 数学/三角函数速查.pdf   →  /files/数学/三角函数速查.pdf
+├── 代码/oi-template.zip   →  /files/代码/oi-template.zip
+└── 说明.txt               →  /files/说明.txt
+```
+
+子目录名就是页面上的分组名。每个条目自动带**大小、日期、sha256 前 8 位**,页面顶部有输入框可以按文件名筛选。下载就是直接下,没有登录、没有跳转页、没有限速。
+
+### ⚠️ 这套方案的硬限制
+
+**它是"把文件提交进 git 仓库",不是对象存储。**
+
+| 限制 | 数值 |
+| --- | --- |
+| GitHub 单文件上限 | **100 MB**(超了推不上去,同步时会提醒) |
+| 仓库建议体积 | 1 GB 以内 |
+| 体积放大 | 文件在 `main`(`files/`)和 `gh-pages`(`public/files/`)各存一份,**仓库占用约等于文件体积 ×2** |
+
+- ✅ PDF、课件、代码包、图片、字体 —— 没问题
+- ❌ 视频、游戏包、系统镜像 —— 请用真正的对象存储
+
+### 为什么不能做"访客上传"
+
+**GitHub Pages 是纯静态托管,没有任何后端。** 上传总得有个地方接收文件、有个地方存,静态站两样都没有。所以只靠这个仓库,访客上传在原理上就做不到。
+
+能做的是下面这些,按"是否值得"排序:
+
+| 方案 | 访客能上传吗 | 代价 | 说明 |
+| --- | --- | --- | --- |
+| `files/` 文件夹(当前方案) | ❌ 只有你能"上传"(丢文件 + deploy) | 0 | 够用:分享自己的资料,不需要别人传 |
+| 第三方网盘 / Alist | ✅ | 0 | 上传在网盘那边,博客只放链接或 iframe。国内可用阿里云盘、蓝奏云;Alist 能自建在 Vercel / Cloudflare 上,带完整网盘 UI |
+| Cloudflare R2 + Worker | ✅ | 0(10 GB 免费额度) | 写几十行 Worker 换上传签名,前端直传。真正可控的对象存储 |
+| Supabase Storage | ✅ | 0(1 GB 免费) | 前端用 anon key 直传,配 RLS 策略控制权限 |
+| Decap CMS + GitHub OAuth | ⚠️ 只有仓库协作者能传 | 一个 OAuth 中转 | 标准做法:网页后台写文章/传图,提交到仓库。需要 serverless 函数做 OAuth 交换 |
+| GitHub API + 个人令牌放前端 | ❌ **不要这么做** | — | 令牌会随 JS 一起发到浏览器,任何人都能拿到它推你的仓库 |
+
+需要"别人也能上传"的话,推荐 **Cloudflare R2 + Worker**(真对象存储,免费额度够用)。
 
 ## 部署
 

@@ -1465,6 +1465,128 @@ p { margin: 0; }
   .nb-out-body { font-size: 12.5px; padding: 10px 12px 12px !important; }
 }
 
+/* ---------- 资源下载页 ---------- */
+.file-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 26px;
+}
+.file-search {
+  position: relative;
+  flex: 1;
+  max-width: 380px;
+}
+.file-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-3);
+  font-size: 16px;
+  pointer-events: none;
+}
+.file-search input {
+  width: 100%;
+  padding: 10px 14px 10px 38px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font: 500 13.5px/1.5 var(--sans);
+  transition: border-color .22s var(--ease), box-shadow .22s var(--ease);
+}
+.file-search input::placeholder { color: var(--text-3); }
+.file-search input:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(46, 230, 255, .14);
+}
+.file-count { font: 500 12.5px/1 var(--mono); color: var(--text-3); }
+
+.file-list { display: flex; flex-direction: column; gap: 9px; }
+
+.file-item { margin: 0; }
+.file-link {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  transition: transform .22s var(--ease), border-color .22s var(--ease), box-shadow .22s var(--ease);
+}
+.file-link:hover {
+  transform: translateX(4px);
+  border-color: var(--line-strong);
+  box-shadow: 0 14px 32px -20px rgba(155, 123, 255, .9);
+}
+
+.file-ext {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  height: 34px;
+  padding: 0 7px;
+  border-radius: 8px;
+  font: 800 10.5px/1 var(--mono);
+  letter-spacing: .04em;
+  color: #07070f;
+  background: linear-gradient(135deg, var(--cyan), var(--violet));
+}
+
+.file-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.file-name {
+  font-size: 14.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color .22s var(--ease);
+}
+.file-link:hover .file-name { color: var(--cyan); }
+.file-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font: 500 11.5px/1 var(--mono);
+  color: var(--text-3);
+  flex-wrap: wrap;
+}
+.file-dot { opacity: .5; }
+.file-sha { color: var(--violet); }
+
+.file-download {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  font: 600 12.5px/1 var(--mono);
+  color: var(--text-2);
+  transition: all .22s var(--ease);
+}
+.file-link:hover .file-download {
+  color: #07070f;
+  background: var(--grad-main);
+  border-color: transparent;
+}
+
+.file-empty { text-align: center; color: var(--text-3); padding: 34px 0; }
+
+@media (max-width: 620px) {
+  .file-toolbar { flex-wrap: wrap; }
+  .file-search { max-width: none; }
+  .file-link { gap: 11px; padding: 12px 13px; }
+  .file-ext { min-width: 38px; font-size: 9.5px; }
+  .file-download span { display: none; }
+  .file-download { padding: 8px; }
+}
+
 /* 数学公式 */
 .katex-display {
   margin: 1.4em 0 !important;

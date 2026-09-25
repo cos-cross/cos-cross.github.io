@@ -1,0 +1,91 @@
+<%
+  // 数据来自 tools/sync-files.mjs 生成的 source/_data/files.yml
+  var files = (site.data && site.data.files) ? site.data.files : [];
+  var t = theme.text || {};
+
+  var groupOrder = [];
+  var groups = {};
+  files.forEach(function (f) {
+    var g = f.group || '根目录';
+    if (!groups[g]) { groups[g] = []; groupOrder.push(g); }
+    groups[g].push(f);
+  });
+
+  var totalBytes = files.reduce(function (s, f) { return s + (f.bytes || 0); }, 0);
+  function human(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(b < 10240 ? 1 : 0) + ' KB';
+    if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+    return (b / 1073741824).toFixed(2) + ' GB';
+  }
+%>
+
+<section class="page-hero">
+  <p class="page-kicker"><%= page.kicker || 'DOWNLOADS' %></p>
+  <h1 class="page-title grad-text"><%= page.title %></h1>
+  <% if (page.subtitle) { %><p class="page-sub"><%= page.subtitle %></p><% } %>
+  <% if (files.length) { %>
+  <p class="page-sub">
+    共 <b><%= files.length %></b> 个文件 · 合计 <b><%= human(totalBytes) %></b>
+  </p>
+  <% } %>
+</section>
+
+<div class="page-content page-intro">
+  <%- page.content %>
+</div>
+
+<% if (files.length) { %>
+<section class="section section-flush">
+  <div class="file-toolbar">
+    <label class="file-search">
+      <span class="file-search-icon" aria-hidden="true">⌕</span>
+      <input type="search" id="file-filter" placeholder="筛选文件名…" autocomplete="off">
+    </label>
+    <span class="file-count" id="file-count"></span>
+  </div>
+
+  <% groupOrder.forEach(function (groupName) { %>
+  <div class="file-group" data-group>
+    <div class="section-head">
+      <h2 class="section-title"><span class="section-bar"></span><%= groupName %></h2>
+      <span class="section-hint"><%= groups[groupName].length %> 个</span>
+    </div>
+
+    <ul class="file-list">
+      <% groups[groupName].forEach(function (f) { %>
+      <li class="file-item" data-name="<%= f.name.toLowerCase() %>">
+        <a class="file-link" href="<%= url_for(f.url) %>" download>
+          <span class="file-ext"><%= (f.name.split('.').pop() || '?').slice(0, 4).toUpperCase() %></span>
+          <span class="file-main">
+            <span class="file-name"><%= f.name %></span>
+            <span class="file-meta">
+              <span><%= f.size %></span>
+              <span class="file-dot">·</span>
+              <span><%= f.date %></span>
+              <span class="file-dot">·</span>
+              <span class="file-sha" title="sha256 前 8 位">sha:<%= f.sha %></span>
+            </span>
+          </span>
+          <span class="file-download">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v9.6l3.3-3.3 1.4 1.4L12 17.4l-5.7-5.7 1.4-1.4L11 13.6V4a1 1 0 0 1 1-1zM5 19h14v2H5z" fill="currentColor"/></svg>
+            <span>下载</span>
+          </span>
+        </a>
+      </li>
+      <% }); %>
+    </ul>
+  </div>
+  <% }); %>
+
+  <p class="file-empty" id="file-empty" hidden>没有匹配的文件。</p>
+</section>
+<% } else { %>
+<div class="section section-flush">
+  <div class="empty-state">
+    <span class="empty-icon" aria-hidden="true">↓</span>
+    <p class="empty-title">还没有可下载的文件</p>
+    <p class="empty-desc">把文件放进仓库根目录的 <b>files/</b> 文件夹,部署后就会出现在这里。</p>
+  </div>
+</div>
+<% } %>
