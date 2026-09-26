@@ -207,9 +207,14 @@ hexo.extend.filter.register('after_post_render', function (data) {
     const globalConds = [];  // 独立成行、不带 where 的约束 = 全图生效
     const shapes = [];       // 线段 / 多边形(先把引用存下来,整块扫完再解析)
     const spheres = [];      // 球面:球心引用也要等点都读完才能解析
+    const wantCenters = [];  // `centers`:在每个球心/点位置打一个点
+    const linkSpecs = [];    // `links(d)`:把相距 d 的两两格点连起来
 
     // segment(A, B) / line(A, B) / polygon(A, B, C) / face(...) / triangle(...)
     const SHAPE_RE = /^(segment|line|polygon|face|triangle)\s*\(/i;
+    // centers / links(d) —— 画晶格骨架用的两个词
+    const CENTERS_RE = /^centers?$/i;
+    const LINKS_RE = /^(links?|bonds?)\s*\(/i;
 
     /**
      * `y = f(x)` / `z = f(x,y)` 这种"左边只有一个因变量"的等式,按显式函数处理。
@@ -248,6 +253,24 @@ hexo.extend.filter.register('after_post_render', function (data) {
               type: 'point', x: p.x, y: p.y, z: p.z, label: p.label, constraints: conds,
             });
           });
+        } catch (e) {
+          problems.push(`${data.source}:"${line}" —— ${e.message}`);
+        }
+      } else if (CENTERS_RE.test(base)) {
+        // `centers`:在每个球心(以及已定义的点)位置打一个点
+        wantCenters.push({ conds, source: line.trim() });
+      } else if (LINKS_RE.test(base)) {
+        // `links(2)`:把相距 2 的两两格点连起来 —— 一条线画出整个相切网络
+        const keyword = /^([A-Za-z_]\w*)/.exec(base)[1].toLowerCase();
+        try {
+          const call = Kit.parseCallArgs(base, keyword);
+          if (!call) throw new Error(`没找到 ${keyword}(...)`);
+          if (call.args.length !== 1) {
+            throw new Error(`${keyword} 只要一个参数,写成 ${keyword}(距离),现在给了 ${call.args.length} 个`);
+          }
+          const d = Kit.evalConst(call.args[0], '距离');
+          if (!(d > 0)) throw new Error('距离要大于 0,现在是 ' + d);
+          linkSpecs.push({ d, conds, source: line.trim() });
         } catch (e) {
           problems.push(`${data.source}:"${line}" —— ${e.message}`);
         }
@@ -386,10 +409,12 @@ hexo.extend.filter.register('after_post_render', function (data) {
 
     // 球面:展开成等值面方程,归到普通的 implicit 条目里。
     // 放在这里(而不是扫描时立刻展开)是因为球心可以引用点的标签。
+    const sphereCenters = [];
     spheres.forEach((sp) => {
       try {
         const c = sp.center || resolve({ label: sp.centerRef });
         const expr = Kit.sphereEquation(c, sp.radius);
+        sphereCenters.push(c);
         items.push({
           type: 'implicit',
           expr,
@@ -402,6 +427,51 @@ hexo.extend.filter.register('after_post_render', function (data) {
         problems.push(`${data.source}:"${sp.source}" —— ${e.message}`);
       }
     });
+
+    /* ---------- 晶格骨架:centers / links(d) ---------- */
+
+    // "格点" = 球心 + 显式写的点。同一个位置只算一次 ——
+    // 球心常常和作者标的点重合(`point(0,0,0) O` + `sphere(O, 1)`)。
+    const keyOf = (p) => `${p.x.toFixed(9)},${p.y.toFixed(9)},${p.z.toFixed(9)}`;
+    const lattice = [];
+    const seenLattice = new Set();
+    const addLattice = (p) => {
+      const k = keyOf(p);
+      if (seenLattice.has(k)) return;
+      seenLattice.add(k);
+      lattice.push(p);
+    };
+    sphereCenters.forEach(addLattice);
+    items.filter((it) => it.type === 'point').forEach(addLattice);
+
+    if ((wantCenters.length || linkSpecs.length) && !lattice.length) {
+      problems.push(`${data.source}:centers / links 需要先有球面或者点,这一块里一个都没有`);
+    }
+
+    if (wantCenters.length) {
+      // 已经有标签的点不用再打一遍,免得同一个位置画两层
+      const labeled = new Set(items.filter((it) => it.type === 'point' && it.label).map(keyOf));
+      wantCenters.forEach((spec) => {
+        lattice.forEach((p) => {
+          if (labeled.has(keyOf(p))) return;
+          items.push({ type: 'point', x: p.x, y: p.y, z: p.z, label: '', constraints: spec.conds });
+        });
+      });
+    }
+
+    if (linkSpecs.length) {
+      let made = 0;
+      linkSpecs.forEach((spec) => {
+        Kit.linkPairs(lattice, spec.d).forEach(([i, j]) => {
+          items.push({ type: 'segment', a: lattice[i], b: lattice[j], constraints: spec.conds });
+          made += 1;
+        });
+      });
+      if (made > 200) {
+        problems.push(`${data.source}:links 生成了 ${made} 条线段,太多了拖动会卡;`
+          + '限制一下范围或者把距离写准一点');
+      }
+    }
 
     // 全局约束并进每一条:语义是"先按整张图的限制裁,再按各自 where 裁"
     items.forEach((it) => { it.constraints = globalConds.concat(it.constraints); });

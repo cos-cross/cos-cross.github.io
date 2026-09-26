@@ -1319,6 +1319,25 @@
   var BOX_FACE_RES = 14;    // 每个面的采样密度
 
   /**
+   * 把"相距正好是 d"的两两格点配成对,返回下标对。
+   *
+   * 容差放宽到 d×1e-6:格点坐标常常是 `sqrt(2)`、`sqrt(8/3)` 这类算出来的,
+   * 双精度下 `hypot` 出来的值可能是 2.0000000000000004,写死等号就配不上了。
+   */
+  function linkPairs(points, d) {
+    const tol = Math.max(1e-6, Math.abs(d) * 1e-6);
+    const out = [];
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        const a = points[i];
+        const b = points[j];
+        if (Math.abs(Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) - d) <= tol) out.push([i, j]);
+      }
+    }
+    return out;
+  }
+
+  /**
    * 求"刚好装得下这些隐式曲面"的采样盒子。
    *
    * 作者的 `x=` `y=` `z=` 是**采样盒子**:零等值面一旦伸到盒子外面,
@@ -2260,6 +2279,7 @@
     fitZoom: fitZoom,
     fitImplicitBox: fitImplicitBox,
     faceCrossed: faceCrossed,
+    linkPairs: linkPairs,
     colormap: colormap,
     niceStep: niceStep,
     GRID_LIMITS: GRID_LIMITS,

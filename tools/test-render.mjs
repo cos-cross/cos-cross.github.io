@@ -573,8 +573,11 @@ console.log('\n=== 构建产物里的真实载荷(端到端) ===');
     let empty = 0;
     let clipped = 0;
     let slit = 0;
+    let linkChecked = 0;
+    let badLinks = 0;
     const clippedNames = [];
     const slitNames = [];
+    const badLinkNames = [];
     const kinds = new Set();
     for (const page of pages) {
       const html = fs.readFileSync(page, 'utf8');
@@ -626,6 +629,39 @@ console.log('\n=== 构建产物里的真实载荷(端到端) ===');
               slitNames.push(`x=[${payload.opts.x.map((v) => v.toFixed(2))}] ${implicit.length} 个曲面`);
             }
           }
+
+          // links(d) 生成的辅助线:每条都必须正好连起两个球心、长度等于两半径之和。
+          // 晶胞那种图靠它说明"哪些球相切",连错了整张图的含义就变了。
+          const segs = (payload.items || []).filter((it) => it.type === 'segment');
+          if (segs.length >= 10 && implicit.length >= 10) {
+            // 从展开后的方程里反推球心:每一项要么是 `(x-1.5)^2`,要么是 `x^2`
+            const axisOf = (expr, v) => {
+              const off = new RegExp(`\\(\\s*${v}\\s*([-+][0-9.eE]+)\\s*\\)\\^2`).exec(expr);
+              if (off) return -Number(off[1]);
+              return new RegExp(`(^|[+(-])${v}\\^2`).test(expr) ? 0 : null;
+            };
+            const centers = implicit.map((it) => {
+              const cx = axisOf(it.expr, 'x');
+              const cy = axisOf(it.expr, 'y');
+              const cz = axisOf(it.expr, 'z');
+              const rm = /=([0-9.eE]+)\s*$/.exec(it.expr);
+              if (cx === null || cy === null || cz === null || !rm) return null;
+              return { x: cx, y: cy, z: cz, r: Math.sqrt(Number(rm[1])) };
+            }).filter(Boolean);
+            const near = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) < 1e-6;
+            const bad = segs.filter((sg) => {
+              const ca = centers.find((c) => near(c, sg.a));
+              const cb = centers.find((c) => near(c, sg.b));
+              if (!ca || !cb || ca === cb) return true;
+              const len = Math.hypot(sg.b.x - sg.a.x, sg.b.y - sg.a.y, sg.b.z - sg.a.z);
+              return Math.abs(len - (ca.r + cb.r)) > 1e-6;
+            });
+            linkChecked += 1;
+            if (bad.length) {
+              badLinks += 1;
+              badLinkNames.push(`${bad.length}/${segs.length} 条不对`);
+            }
+          }
         }
       }
     }
@@ -638,6 +674,8 @@ console.log('\n=== 构建产物里的真实载荷(端到端) ===');
       `${clipped} 张被切:${clippedNames.slice(0, 3).join('; ')}`);
     ok('没有一张图的曲面被采样盒子切成碎片', slit === 0,
       `${slit} 张被切:${slitNames.slice(0, 3).join('; ')}`);
+    ok('辅助线段全都正好连起两个相切的球心', badLinks === 0,
+      `${linkChecked} 张晶胞图里 ${badLinks} 张有问题:${badLinkNames.join('; ')}`);
     console.log(`       跑了 ${total} 张图,图元类型:${[...kinds].join(' / ')}`);
   }
 }

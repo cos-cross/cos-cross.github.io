@@ -677,6 +677,48 @@ console.log('\n=== 采样盒子装不装得下(球只剩碎片的那个 bug) ===
   ok('病态表达式不会无限撑下去(有轮数上限)', Date.now() - t0 < 3000, `${Date.now() - t0}ms`);
 }
 
+console.log('\n=== links(d):把相切的球心连起来 ===');
+{
+  const S = Math.SQRT2;
+  // 面心立方晶胞的 14 个球心
+  const fcc = [];
+  for (const x of [-S, S]) for (const y of [-S, S]) for (const z of [-S, S]) fcc.push({ x, y, z });
+  fcc.push({ x: 0, y: 0, z: S }, { x: 0, y: 0, z: -S }, { x: 0, y: S, z: 0 },
+    { x: 0, y: -S, z: 0 }, { x: S, y: 0, z: 0 }, { x: -S, y: 0, z: 0 });
+
+  const pairs2 = Kit.linkPairs(fcc, 2);
+  // 角球↔面心球 8×3=24,面心球之间(正八面体的 12 条棱)= 12
+  ok('面心立方:相距 2 的球心对有 36 对', pairs2.length === 36, `${pairs2.length} 对`);
+  ok('配出来的对距离都真的是 2', pairs2.every(([i, j]) => {
+    const a = fcc[i]; const b = fcc[j];
+    return Math.abs(Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) - 2) < 1e-9;
+  }));
+  ok('棱长 2√2(角球之间)配出来也都真的是那个距离',
+    Kit.linkPairs(fcc, 2 * Math.SQRT2).every(([i, j]) => {
+      const a = fcc[i]; const b = fcc[j];
+      return Math.abs(Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) - 2 * Math.SQRT2) < 1e-9;
+    }));
+  ok('距离写错时一对都配不出来', Kit.linkPairs(fcc, 1.7).length === 0);
+  ok('容差能吃掉浮点噪声',
+    Kit.linkPairs([{ x: 0, y: 0, z: 0 }, { x: 2 + 4e-16, y: 0, z: 0 }], 2).length === 1);
+  ok('超出容差就不连',
+    Kit.linkPairs([{ x: 0, y: 0, z: 0 }, { x: 2.001, y: 0, z: 0 }], 2).length === 0);
+
+  // 六方最密堆积的 17 个球心
+  const h = Math.sqrt(8 / 3);
+  const hex = [[2, 0], [1, Math.sqrt(3)], [-1, Math.sqrt(3)], [-2, 0], [-1, -Math.sqrt(3)], [1, -Math.sqrt(3)], [0, 0]];
+  const mid = [[1, Math.sqrt(3) / 3], [-1, Math.sqrt(3) / 3], [0, -2 * Math.sqrt(3) / 3]];
+  const hcp = [];
+  hex.forEach(([x, y]) => hcp.push({ x, y, z: -h }));
+  mid.forEach(([x, y]) => hcp.push({ x, y, z: 0 }));
+  hex.forEach(([x, y]) => hcp.push({ x, y, z: h }));
+  ok('六方最密:17 个球之间有 45 对相切',
+    Kit.linkPairs(hcp, 2).length === 45, `${Kit.linkPairs(hcp, 2).length} 对`);
+
+  ok('只有一个点时不产生线段', Kit.linkPairs([{ x: 0, y: 0, z: 0 }], 2).length === 0);
+  ok('空数组安全', Kit.linkPairs([], 2).length === 0);
+}
+
 console.log('\n=== 刻度与配色 ===');
 ok('niceStep 给出整齐的步长', [Kit.niceStep(10, 8), Kit.niceStep(1, 8), Kit.niceStep(1000, 5)]
   .every((v) => { const m = v / 10 ** Math.round(Math.log10(v)); return [1, 2, 5].some((k) => near(m, k) || near(m * 10, k)); }));
