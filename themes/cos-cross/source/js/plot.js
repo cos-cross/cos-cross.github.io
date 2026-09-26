@@ -1114,11 +1114,38 @@
     });
   }
 
+  /**
+   * 把一个四边形从重心往外撑开 px 像素。
+   *
+   * 半透明填充时不能用"同色描边"去压相邻四边形之间的缝 ——
+   * 描边会沿着每条棱再叠一层 alpha,整张网格线就浮出来了。
+   * 改成把每个面稍微放大一点点让相邻面互相咬住,接缝就藏住了。
+   */
+  function inflateQuad(pts, px) {
+    var cx = 0, cy = 0;
+    for (var i = 0; i < 4; i++) { cx += pts[i].x; cy += pts[i].y; }
+    cx /= 4; cy /= 4;
+    return pts.map(function (p) {
+      var dx = p.x - cx, dy = p.y - cy;
+      var len = Math.hypot(dx, dy);
+      if (len < 1e-6) return p;
+      return { x: p.x + (dx / len) * px, y: p.y + (dy / len) * px, depth: p.depth };
+    });
+  }
+
   function render3D(ctx, canvas, state, theme) {
     var w = canvas.width / theme.dpr;
     var h = canvas.height / theme.dpr;
     ctx.setTransform(theme.dpr, 0, 0, theme.dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
+
+    // 半透明:按深度从远到近、每个面各自带 alpha,后面的曲面就能透出来。
+    // （如果整块曲面先画到离屏画布再整体压 alpha,球就只剩正面一层了 ——
+    //   背面被同色的正面盖住,反而看不到"透明"的效果。）
+    var alpha = (typeof state.alpha === 'number' && state.alpha > 0.05 && state.alpha < 1)
+      ? state.alpha
+      : 1;
+    var translucent = alpha < 1;
 
     // 每个曲面各自算四边形,再合成一个列表统一排序 ——
     // 这样多个曲面之间也能正确互相遮挡。
@@ -1156,6 +1183,7 @@
     for (var i = 0; i < quads.length; i++) {
       var q = quads[i];
       if (q.kind === 'point') {
+        ctx.globalAlpha = 1;
         ctx.beginPath();
         ctx.arc(q.x, q.y, Math.max(2.5, Math.min(14, q.r)), 0, Math.PI * 2);
         ctx.fillStyle = '#ffd166';
@@ -1181,23 +1209,34 @@
         ? hexToRgb(COLORS[q.surface % COLORS.length])
         : colormap(q.t).match(/\d+/g));
       var m = q.light;
+      // 半透明时要少压暗一些 —— 深色背景下本来就暗,再乘个 0.2 就几乎看不见了
+      if (translucent) m = 0.55 + 0.45 * m;
       // 用四边形法线算出的明暗系数调制颜色,曲面才有立体感
       var r = Math.min(255, Math.round(rgb[0] * m));
       var g = Math.min(255, Math.round(rgb[1] * m));
       var b = Math.min(255, Math.round(rgb[2] * m));
 
+      var pts = translucent ? inflateQuad(q.pts, 0.6) : q.pts;
       ctx.beginPath();
-      ctx.moveTo(q.pts[0].x, q.pts[0].y);
-      ctx.lineTo(q.pts[1].x, q.pts[1].y);
-      ctx.lineTo(q.pts[2].x, q.pts[2].y);
-      ctx.lineTo(q.pts[3].x, q.pts[3].y);
+      ctx.moveTo(pts[0].x, pts[0].y);
+      ctx.lineTo(pts[1].x, pts[1].y);
+      ctx.lineTo(pts[2].x, pts[2].y);
+      ctx.lineTo(pts[3].x, pts[3].y);
       ctx.closePath();
-      ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
-      ctx.fill();
-      // 极细的同色边线能压掉相邻四边形之间的白缝
-      ctx.strokeStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
-      ctx.lineWidth = 0.7;
-      ctx.stroke();
+      var flat = 'rgb(' + r + ',' + g + ',' + b + ')';
+      ctx.fillStyle = flat;
+      if (translucent) {
+        // 每个面单独设一次 alpha,画完立刻还原(后面的点必须是不透明的)
+        ctx.globalAlpha = alpha;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.fill();
+        // 极细的同色边线能压掉相邻四边形之间的白缝
+        ctx.strokeStyle = flat;
+        ctx.lineWidth = 0.7;
+        ctx.stroke();
+      }
     }
 
     drawAxes3D(ctx, state, w, h, theme);
@@ -1341,6 +1380,14 @@
           return { kind: 'surface', data: buildSurface(it.expr, o) };
         });
         state.cam = { az: -0.62, el: 0.52, dist: 3.4, focal: 3.4, zoom: 1 };
+        // 曲面透明度由构建期定好(作者写了 alpha= 就用他的值,没写时
+        // "多个曲面"默认半透明 —— 否则前面的球会把后面的全挡住)。
+        // 客户端只负责读它,并且允许用工具条上的按钮临时切回不透明。
+        state.alphaDefault = (typeof payload.opts.alpha === 'number'
+          && payload.opts.alpha > 0.05 && payload.opts.alpha <= 1)
+          ? payload.opts.alpha
+          : 1;
+        state.alpha = state.alphaDefault;
 
         // 点从数学坐标换算到和曲面同一套归一化立方体里。
         // 显式曲面的 opts.z 是"颜色映射范围"、允许为 null,这时用曲面实际的高度范围兜底。
@@ -1618,11 +1665,26 @@
       draw();
     }
 
+    // 1) 半透明切换:直接改变"填充时用的 alpha",所以后面的曲面能透出来,
+    //    不需要重新计算网格。0.62 是试出来的 —— 再低一片糊,再高看不见背面。
+    function syncAlphaButton(btn) {
+      var on = state.alpha < 1;
+      btn.classList.toggle('is-on', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.title = on ? '当前半透明:能看见后面的曲面,点击改为不透明' : '点击改为半透明';
+    }
+
     el.querySelectorAll('[data-plot-action]').forEach(function (btn) {
+      if (btn.dataset.plotAction === 'alpha') syncAlphaButton(btn);
       btn.addEventListener('click', function () {
         var act = btn.dataset.plotAction;
         if (act === 'reset') reset();
-        else if (act === 'save') {
+        else if (act === 'alpha' && kind === '3d') {
+          // 在三档之间切:默认值 → 不透明 → 半透明(0.62)
+          state.alpha = state.alpha >= 1 ? (state.alphaDefault < 1 ? state.alphaDefault : 0.62) : 1;
+          syncAlphaButton(btn);
+          draw();
+        } else if (act === 'save') {
           var a = document.createElement('a');
           a.download = (el.dataset.title || 'plot') + '.png';
           a.href = canvas.toDataURL('image/png');
@@ -1690,6 +1752,7 @@
     rotatePoint: rotatePoint,
     colormap: colormap,
     niceStep: niceStep,
+    inflateQuad: inflateQuad,
     mount: mount,
     boot: boot,
   };

@@ -145,15 +145,22 @@ function buildBlock(kind, payload, opts, rawSource, label, ratio) {
     ? '拖动旋转 · 滚轮缩放 · 双击重置'
     : '滚轮缩放 · 拖动平移 · 双击重置';
 
+  // "半透明"按钮只给 3D —— 2D 曲线没有互相遮挡的问题
+  const actions = [
+    '    <span class="plot-actions">',
+    '      <button type="button" data-plot-action="reset">重置</button>',
+  ];
+  if (kind === '3d') {
+    actions.push('      <button type="button" data-plot-action="alpha" aria-pressed="false">半透明</button>');
+  }
+  actions.push('      <button type="button" data-plot-action="save">存为 PNG</button>', '    </span>');
+
   return [
     `<div class="plot" data-kind="${kind}" data-mount${ratio ? ` data-ratio="${ratio}"` : ''}>`,
     '  <div class="plot-bar">',
     `    <span class="plot-kind">${escapeHtml(label)}</span>`,
     `    <span class="plot-hint">${hint}</span>`,
-    '    <span class="plot-actions">',
-    '      <button type="button" data-plot-action="reset">重置</button>',
-    '      <button type="button" data-plot-action="save">存为 PNG</button>',
-    '    </span>',
+    ...actions,
     '  </div>',
     '  <div class="plot-stage"><canvas></canvas></div>',
     `  <script type="application/json">${json}</script>`,
@@ -330,10 +337,20 @@ hexo.extend.filter.register('after_post_render', function (data) {
           z: Array.isArray(o.z) ? normalizeRange(o.z, [-1, 1]) : null,
           grid: Math.max(8, Math.min(90, o.grid || 46)),
         };
+
+      // 曲面透明度。作者写了 alpha= / opacity= 就用他的;
+      // 没写时"多个曲面"默认半透明 —— 否则前面的曲面会把后面的全挡住,
+      // 叠四个球看起来还是一个球。单个曲面保持不透明(实心的更好看)。
+      const asked = Number.isFinite(o.alpha) ? o.alpha : o.opacity;
+      let alpha = Number.isFinite(asked) ? Math.max(0.05, Math.min(1, asked)) : 1;
+      if (!Number.isFinite(asked) && surfaces.length > 1) alpha = 0.62;
+      o2.alpha = alpha;
+
       payload = { items: surfaces.concat(points), opts: o2 };
       label = surfaces.length === 1
         ? (anyImplicit ? `3D 等值面 · ${surfaces[0].expr}` : `3D 曲面 · z = ${surfaces[0].expr}`)
         : `3D · ${surfaces.length} 个曲面`;
+      if (alpha < 1) label += ` · 半透明 ${Math.round(alpha * 100)}%`;
       const globalCount = globalConds.length;
       if (globalCount) label += ` · ${globalCount} 个全局约束`;
       if (surfaces.some((it) => it.constraints.length > globalCount)) label += ' · 带 where';

@@ -41,7 +41,10 @@ function makeCtx(record) {
     set textBaseline(v) { record.textBaseline = v; },
     get textBaseline() { return record.textBaseline; },
     lineJoin: 'miter', lineCap: 'butt',
-    shadowColor: '', shadowBlur: 0, globalAlpha: 1,
+    shadowColor: '', shadowBlur: 0,
+    // 半透明是靠 globalAlpha 实现的,所以它必须能被记录下来供断言
+    set globalAlpha(v) { record.globalAlpha = v; },
+    get globalAlpha() { return record.globalAlpha; },
     setTransform() {}, clearRect() {},
     beginPath() { record.paths.push([]); },
     rect(x, y, w, h) { record.rects.push([x, y, w, h]); record.curRects += 1; if (record.cur) record.cur.push(['r', x, y, w, h]); },
@@ -53,8 +56,9 @@ function makeCtx(record) {
       const path = record.cur ? record.cur.slice() : [];
       record.fills.push(path);
       record.fillRectCounts.push(record.curRects);
-      record.shapes.push({ kind: 'fill', style: record.fillStyle, path });
-      record.cur = null;
+      record.shapes.push({ kind: 'fill', style: record.fillStyle, alpha: record.globalAlpha, path });
+      // 注意:这里**不能**把 cur 清空 —— 画布上 fill() 之后紧跟的 stroke()
+      // 描的是同一条路径(压缝就是这么做的),清空了就记录不到描边。
       record.curRects = 0;
     },
     stroke() {
@@ -62,8 +66,7 @@ function makeCtx(record) {
       record.strokes.push(path);
       record.shapes.push({ kind: 'stroke', style: record.strokeStyle, width: record.lineWidth, path });
       record.cur = null;
-    },
-    fillText(t, x, y) { record.texts.push([t, x, y]); },
+    },    fillText(t, x, y) { record.texts.push([t, x, y]); },
     save() {}, restore() {}, translate() {}, rotate() {}, scale() {},
     toDataURL() { return 'data:image/png;base64,'; },
   };
@@ -78,6 +81,7 @@ function makeEl(kind, payload, opts = {}) {
     paths: [], rects: [], moves: [], lines: [], arcs: [], fills: [], strokes: [], texts: [],
     shapes: [], cur: null, errorNodes: [], curRects: 0, fillRectCounts: [],
     fillStyle: null, strokeStyle: null, lineWidth: null, font: null, textAlign: null, textBaseline: null,
+    globalAlpha: 1,
   };
   const canvas = {
     width: 800, height: 460,
@@ -88,6 +92,27 @@ function makeEl(kind, payload, opts = {}) {
     addEventListener() {}, setPointerCapture() {}, releasePointerCapture() {},
   };
   const payloadEl = { textContent: JSON.stringify(payload) };
+
+  // 工具条按钮的桩:只为把"半透明"开关这条路也跑一遍
+  function makeButton(action) {
+    const listeners = [];
+    const cls = new Set();
+    const attrs = {};
+    return {
+      dataset: { plotAction: action },
+      classList: {
+        toggle(c, on) { if (on) cls.add(c); else cls.delete(c); },
+        contains: (c) => cls.has(c),
+      },
+      setAttribute(k, v) { attrs[k] = v; },
+      getAttribute: (k) => attrs[k],
+      title: '',
+      addEventListener(ev, fn) { if (ev === 'click') listeners.push(fn); },
+      click() { listeners.forEach((fn) => fn()); },
+    };
+  }
+  const buttons = ['reset', 'alpha', 'save'].map(makeButton);
+
   const el = {
     dataset: Object.assign({
       kind,
@@ -99,14 +124,14 @@ function makeEl(kind, payload, opts = {}) {
       if (sel === '.plot-error') return record.errors.length ? { textContent: record.errors[record.errors.length - 1] } : null;
       return null;
     },
-    querySelectorAll() { return []; },
+    querySelectorAll(sel) { return sel === '[data-plot-action]' ? buttons : []; },
     appendChild(node) {
       // textContent 是 appendChild 之后才赋值的,所以存节点本身、断言时再读
       if (node && node.className === 'plot-error') record.errorNodes.push(node);
     },
     style: {},
   };
-  return { el, canvas, record };
+  return { el, canvas, record, buttons };
 }
 
 /** 把 PlotKit.mount 需要的浏览器全局装上 */
@@ -141,7 +166,7 @@ function withDom(fn) {
 }
 
 function render(kind, payload, opts) {
-  const { el, canvas, record } = makeEl(kind, payload, opts);
+  const { el, canvas, record, buttons } = makeEl(kind, payload, opts);
   withDom(() => {
     try {
       Kit.mount(el);
@@ -150,7 +175,7 @@ function render(kind, payload, opts) {
       el.dataset.error = '1';
     }
   });
-  return { el, canvas, record };
+  return { el, canvas, record, buttons };
 }
 
 /** 只取某种颜色的描边(用来把曲线和坐标轴/网格分开看) */
@@ -270,6 +295,78 @@ console.log('\n=== 3D 多曲面(正四面体堆积的四个相切球:用户笔�
   // 多曲面时按曲面编号上色,应该出现多种颜色
   const colors = new Set(record.shapes.filter((s) => s.kind === 'fill').map((s) => s.style));
   ok('多个曲面用了不同颜色', colors.size >= 3, `${colors.size} 种颜色`);
+}
+
+console.log('\n=== 半透明曲面 ===');
+{
+  const items = [
+    { type: 'implicit', expr: 'x^2+y^2+z^2=1', constraints: [] },
+    { type: 'implicit', expr: '(x-1)^2+y^2+z^2=1', constraints: [] },
+  ];
+
+  // 1) 构建期没给 alpha 时:多个曲面依然画出东西,而且是不透明的
+  const opaque = render('3d', { items, opts: { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 20 } });
+  ok('不传 alpha 时没有报错', !opaque.el.dataset.error, errText(opaque.record));
+  ok('不传 alpha 时全部是不透明的',
+    opaque.record.shapes.filter((s) => s.kind === 'fill').every((s) => s.alpha === 1));
+  const opaqueStrokes = opaque.record.shapes.filter((s) => s.kind === 'stroke' && s.path.length === 4).length;
+  ok('不透明时仍然用同色描边压缝', opaqueStrokes > 100, `${opaqueStrokes} 条`);
+
+  // 2) alpha=0.6:每个面按 0.6 填,而且不能再描边
+  const trans = render('3d', { items, opts: { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 20, alpha: 0.6 } });
+  ok('半透明时没有报错', !trans.el.dataset.error, errText(trans.record));
+  const fills = trans.record.shapes.filter((s) => s.kind === 'fill');
+  ok('曲面四边形都画出来了', fills.length > 300, `${fills.length} 个面`);
+  ok('每个面都按 0.6 填', fills.every((s) => Math.abs(s.alpha - 0.6) < 1e-9));
+  // 坐标轴本身也要描边,所以只看"四边形形状"的描边(path 有 4 个点)
+  const quadStrokes = trans.record.shapes.filter((s) => s.kind === 'stroke' && s.path.length === 4);
+  ok('半透明时四边形不再描边(否则网格线会浮出来)', quadStrokes.length === 0, `${quadStrokes.length} 条`);
+  ok('画完曲面后 alpha 还原成 1', trans.record.globalAlpha === 1, String(trans.record.globalAlpha));
+  ok('面的顶点仍然是 4 个(只是被撑大了一点)',
+    fills.every((s) => s.path.length === 4));
+  // 撑开之后相邻面的投影范围会比不透明时略大
+  const spanOf = (rec) => {
+    const xs = rec.shapes.filter((s) => s.kind === 'fill').flatMap((s) => s.path.map((p) => p[1]));
+    return Math.max(...xs) - Math.min(...xs);
+  };
+  ok('半透明时四边形被撑开(接缝由相邻面互相咬住)', spanOf(trans.record) > spanOf(opaque.record));
+
+  // 3) 点在任何 alpha 下都必须是不透明的
+  const withPoint = render('3d', {
+    items: items.concat([{ type: 'point', x: 0, y: 0, z: 0, label: 'O', constraints: [] }]),
+    opts: { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 16, alpha: 0.5 },
+  });
+  ok('有点时没有报错', !withPoint.el.dataset.error, errText(withPoint.record));
+  ok('点是画出来的', withPoint.record.arcs.length >= 1);
+  ok('点不会被画成半透明', withPoint.record.globalAlpha === 1, String(withPoint.record.globalAlpha));
+
+  // 4) alpha 越界要夹住,不能画出全透明的东西
+  const clamped = render('3d', { items, opts: { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 16, alpha: 3 } });
+  ok('alpha 超出范围时按不透明处理',
+    clamped.record.shapes.filter((s) => s.kind === 'fill').every((s) => s.alpha === 1));
+
+  // 5) 工具条上的「半透明」按钮要能来回切
+  // 点击会触发 draw(),而 draw 要读 CSS 变量 —— 所以点击也得在 DOM 桩里跑
+  const clickIn = (btn) => withDom(() => btn.click());
+  const toggle = render('3d', { items, opts: { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 16 } });
+  const alphaBtn = toggle.buttons.find((b) => b.dataset.plotAction === 'alpha');
+  const lastAlpha = () => toggle.record.shapes.filter((s) => s.kind === 'fill').pop().alpha;
+  ok('默认不透明时按钮显示为关闭', alphaBtn.getAttribute('aria-pressed') === 'false');
+  clickIn(alphaBtn);
+  ok('点一下变成半透明', lastAlpha() < 1 && lastAlpha() > 0.05, String(lastAlpha()));
+  ok('按钮进入按下状态', alphaBtn.getAttribute('aria-pressed') === 'true' && alphaBtn.classList.contains('is-on'));
+  clickIn(alphaBtn);
+  ok('再点一下变回不透明', lastAlpha() === 1);
+  ok('按钮回到未按下状态', alphaBtn.getAttribute('aria-pressed') === 'false' && !alphaBtn.classList.contains('is-on'));
+  // 构建期已经给了 alpha 的图,点一下就回到作者给的那个值,而不是硬编码的 0.62
+  const authored = render('3d', { items, opts: { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 16, alpha: 0.35 } });
+  const btn2 = authored.buttons.find((b) => b.dataset.plotAction === 'alpha');
+  const lastAlpha2 = () => authored.record.shapes.filter((s) => s.kind === 'fill').pop().alpha;
+  ok('作者给了 alpha 时按钮初始就是按下状态', btn2.getAttribute('aria-pressed') === 'true');
+  clickIn(btn2);
+  ok('切回不透明', lastAlpha2() === 1);
+  clickIn(btn2);
+  ok('再切回作者指定的 0.35', Math.abs(lastAlpha2() - 0.35) < 1e-9, String(lastAlpha2()));
 }
 
 console.log('\n=== 3D 隐式曲面 + 约束 + 点 ===');

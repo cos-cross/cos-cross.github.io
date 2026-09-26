@@ -381,6 +381,21 @@ ok('两条都有一半左右被保留',
   dA.filter((p) => p.y !== null).length > 90 && dA.filter((p) => p.y !== null).length < 110
   && dB.filter((p) => p.y !== null).length > 90 && dB.filter((p) => p.y !== null).length < 110);
 
+console.log('\n=== 半透明四边形(压接缝) ===');
+{
+  const quad = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+  const grown = Kit.inflateQuad(quad, 1);
+  const centerOf = (qs) => qs.reduce((s, p) => s + p.x, 0) / qs.length;
+  ok('顶点数不变', grown.length === 4);
+  ok('重心不动', Math.abs(centerOf(grown) - centerOf(quad)) < 1e-9);
+  ok('每个顶点都被推离重心', grown.every((p, i) => Math.hypot(p.x - 5, p.y - 5) > Math.hypot(quad[i].x - 5, quad[i].y - 5)));
+  ok('推开的距离正好是给的像素数',
+    Math.abs(Math.hypot(grown[0].x - 5, grown[0].y - 5) - (Math.hypot(-5, -5) + 1)) < 1e-9);
+  ok('退化四边形(所有点重合)不会算出 NaN',
+    Kit.inflateQuad([{ x: 3, y: 3 }, { x: 3, y: 3 }, { x: 3, y: 3 }, { x: 3, y: 3 }], 1)
+      .every((p) => p.x === 3 && p.y === 3));
+}
+
 console.log('\n=== 刻度与配色 ===');
 ok('niceStep 给出整齐的步长', [Kit.niceStep(10, 8), Kit.niceStep(1, 8), Kit.niceStep(1000, 5)]
   .every((v) => { const m = v / 10 ** Math.round(Math.log10(v)); return [1, 2, 5].some((k) => near(m, k) || near(m * 10, k)); }));
