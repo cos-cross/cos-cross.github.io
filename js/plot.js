@@ -1277,6 +1277,88 @@
     return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
   }
 
+  /**
+   * 收集"算适配比例用的探针点"。
+   *
+   * 为什么不直接拿内容的包围盒 8 个角去算:盒子角上往往是空的
+   * (球填在盒子里,角在外面),按盒角适配会把图形缩到画面一半大。
+   * 但也不能全量收集 —— 一个晶胞动辄上万顶点 —— 所以抽稀到 1500 个,
+   * 估外轮廓足够了。
+   */
+  function contentProbes(state, limit) {
+    var cap = limit || 1500;
+    var all = [];
+    var push = function (x, y, z) {
+      if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) all.push({ x: x, y: y, z: z });
+    };
+
+    (state.surfaces || []).forEach(function (s) {
+      if (s.kind === 'mesh') {
+        s.data.verts.forEach(function (v) { push(v.x, v.y, v.z); });
+      } else {
+        // 显式高度场:ux/uz/uy 就是渲染空间的三轴
+        s.data.grid.forEach(function (row) {
+          row.forEach(function (v) { if (Number.isFinite(v.uz)) push(v.ux, v.uz, v.uy); });
+        });
+      }
+    });
+    (state.points || []).forEach(function (p) { push(p.nx, p.ny, p.nz); });
+    (state.segments || []).forEach(function (g) {
+      push(g.a.x, g.a.y, g.a.z);
+      push(g.b.x, g.b.y, g.b.z);
+    });
+    (state.polygons || []).forEach(function (f) {
+      f.pts.forEach(function (p) { push(p.x, p.y, p.z); });
+    });
+
+    if (all.length <= cap) return all;
+    // 等间隔抽稀:顶点是按网格顺序生成的,等间隔取就能均匀覆盖整个曲面
+    var out = [];
+    var step = all.length / cap;
+    for (var i = 0; i < cap; i++) out.push(all[Math.floor(i * step)]);
+    return out;
+  }
+
+  /** 适配比例要对这些角度都成立(见 fitZoom 的说明) */
+  var FIT_AZ_STEPS = [0, 60, 120, 180, 240, 300];
+  var FIT_EL_SPREAD = 0.35;
+
+  /**
+   * 算出让全部内容刚好装进画布的 zoom。
+   *
+   * 投影里 screen = 中心 + r·(focal/depth)·min(w,h)·0.42·zoom,
+   * 对 zoom 是**线性**的 —— 所以按 zoom=1 投影一遍,量出超了多少,再一次除回去。
+   *
+   * 关键点:适配是挂载时算一次的,但用户接下来会拖动旋转。只按初始角度贴边适配的话,
+   * 转一下就又被切掉了。所以方位角取 6 个、仰角取 3 个,取**最坏情况**。
+   * 代价是比"只按初始角度贴边"小一圈,换来的是转起来不会掉东西。
+   *
+   * 上下限只做保护:上限防止内容只占画面一小角时放得过大,下限防止极端情况下缩成一个点。
+   */
+  function fitZoom(probes, cam, w, h, margin) {
+    if (!probes || !probes.length) return 1;
+    var pad = margin === undefined ? 0.9 : margin;
+    var els = [cam.el, cam.el - FIT_EL_SPREAD, cam.el + FIT_EL_SPREAD];
+    var need = 0;
+    for (var ai = 0; ai < FIT_AZ_STEPS.length; ai++) {
+      for (var ei = 0; ei < els.length; ei++) {
+        var c = {
+          az: cam.az + FIT_AZ_STEPS[ai] * Math.PI / 180,
+          el: Math.max(-1.5, Math.min(1.5, els[ei])),
+          dist: cam.dist, focal: cam.focal, zoom: 1,
+        };
+        for (var i = 0; i < probes.length; i++) {
+          var q = project(probes[i], c, w, h);
+          need = Math.max(need,
+            Math.abs(q.x - w / 2) / (w / 2 * pad),
+            Math.abs(q.y - h / 2) / (h / 2 * pad));
+        }
+      }
+    }
+    if (!(need > 0)) return 1;
+    return Math.max(0.12, Math.min(3, 1 / need));
+  }
+
   function render3D(ctx, canvas, state, theme) {
     var w = canvas.width / theme.dpr;
     var h = canvas.height / theme.dpr;
@@ -1585,7 +1667,9 @@
     var rect = canvas.getBoundingClientRect();
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
     var w = Math.max(240, Math.round(rect.width));
-    var h = Math.round(w * (el.dataset.ratio ? parseFloat(el.dataset.ratio) : (el.dataset.kind === '3d' ? 0.62 : 0.58)));
+    // 3D 的投影包围盒接近正方形,所以画布也偏方一点(0.78);
+    // 早期用的 0.62 太扁,图形被高度卡住,左右白白空掉一大条。
+    var h = Math.round(w * (el.dataset.ratio ? parseFloat(el.dataset.ratio) : (el.dataset.kind === '3d' ? 0.78 : 0.58)));
     canvas.style.height = h + 'px';
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
@@ -1767,6 +1851,16 @@
 
     var size = setupCanvas(canvas, el);
 
+    // 3D:第一帧就把镜头拉到刚好装下全部内容。
+    // 默认视角(dist 3.4 / focal 3.4 / zoom 1)是按"球在图中央"的小图调的,
+    // 图形一旦铺满包围盒(晶胞那种),上下两条棱就会被画布切掉。
+    if (kind === '3d') {
+      state.probes = contentProbes(state);
+      state.fit = fitZoom(state.probes, state.cam, size.w, size.h);
+      state.cam.zoom = state.fit;
+      state.userZoomed = false;
+    }
+
     function resample() {
       if (kind === '3d') return;
       var range = { x: [state.view.x0, state.view.x1], y: [state.view.y0, state.view.y1] };
@@ -1851,6 +1945,7 @@
     function zoomAt(px, py, factor) {
       if (kind === '3d') {
         state.cam.zoom = Math.max(0.25, Math.min(6, state.cam.zoom * factor));
+        state.userZoomed = true; // 手动缩放过之后,窗口尺寸变化就别再自动适配了
         return;
       }
       var v = state.view;
@@ -1897,8 +1992,10 @@
         var d = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
         if (pinchStart > 0) {
           var factor = d / pinchStart;
-          if (kind === '3d') state.cam.zoom = Math.max(0.25, Math.min(6, pinchZoom * factor));
-          else {
+          if (kind === '3d') {
+            state.cam.zoom = Math.max(0.25, Math.min(6, pinchZoom * factor));
+            state.userZoomed = true;
+          } else {
             // 双指缩放:以画布中心为锚点
             state.view = scaleView(state.view, factor);
             resample();
@@ -1951,7 +2048,11 @@
     function reset() {
       state.panX = 0; state.panY = 0;
       if (kind === '3d') {
-        state.cam.az = -0.62; state.cam.el = 0.52; state.cam.zoom = 1;
+        state.cam.az = -0.62; state.cam.el = 0.52;
+        // 回到"刚好装下全部内容"的那个比例,而不是写死的 1 ——
+        // 不然双击重置之后图形又被切掉了。
+        state.cam.zoom = state.fit || 1;
+        state.userZoomed = false;
       } else {
         state.view.x0 = payload.opts.x[0];
         state.view.x1 = payload.opts.x[1];
@@ -1989,7 +2090,19 @@
       });
     });
 
-    var ro = window.ResizeObserver ? new ResizeObserver(function () { draw(); }) : null;
+    var ro = window.ResizeObserver ? new ResizeObserver(function () {
+      // 画布宽度变了(换窗口 / 收起侧栏)就得重新算一次适配比例,
+      // 否则按旧宽度算出来的 zoom 会把图形切掉。用户手动缩放过就不动他了。
+      if (kind === '3d') {
+        var rect = canvas.getBoundingClientRect();
+        if (Math.abs(rect.width - size.w) >= 1) {
+          size = setupCanvas(canvas, el);
+          state.fit = fitZoom(state.probes, state.cam, size.w, size.h);
+          if (!state.userZoomed) state.cam.zoom = state.fit;
+        }
+      }
+      draw();
+    }) : null;
     if (ro) ro.observe(el);
 
     canvas.style.cursor = 'grab';
@@ -2051,6 +2164,8 @@
     applyOrbit: applyOrbit,
     project: project,
     rotatePoint: rotatePoint,
+    contentProbes: contentProbes,
+    fitZoom: fitZoom,
     colormap: colormap,
     niceStep: niceStep,
     GRID_LIMITS: GRID_LIMITS,
