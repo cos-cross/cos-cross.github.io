@@ -114,5 +114,52 @@ console.log('\n=== 静态资源的缓存指纹(asset_v)===');
   ok('查询串能被剥掉', url.split('#')[0].split('?')[0] === '/css/style.css');
 }
 
+console.log('\n=== 资源页两档:体积阈值与 Release 直链 ===');
+{
+  const {
+    human, parseRemote, remoteFromGitConfig, releaseBase, releaseAssetUrl, sizeClass,
+    GIT_LIMIT, GIT_WARN, RELEASE_LIMIT,
+  } = require(path.join(root, 'tools', 'files-index.cjs'));
+  const MB = 1024 * 1024;
+
+  ok('体积阈值:20 MB 是提醒线', GIT_WARN === 20 * MB && GIT_LIMIT === 100 * MB);
+  ok('25 MB → 提醒(仓库会涨)', sizeClass(25 * MB) === 'warn');
+  ok('100 MB 刚好还能进仓库', sizeClass(GIT_LIMIT) === 'warn');
+  ok('100 MB 多 1 字节就进不了 git', sizeClass(GIT_LIMIT + 1) === 'over-git');
+  ok('1 GB → 进不了 git,但 Release 放得下', sizeClass(1024 * MB) === 'over-git');
+  ok('2 GB 刚好是 Release 上限', sizeClass(2 * 1024 * MB) === 'over-git');
+  ok('超过 2 GB → 连 Release 也不行', sizeClass(2 * 1024 * MB + 1) === 'over-release');
+  ok('human 显示和页面一致', human(1147414013) === '1.07 GB' && human(27049119) === '25.8 MB'
+    && human(1536) === '1.5 KB');
+
+  const gh = parseRemote('https://github.com/cos-cross/cos-cross.github.io.git');
+  ok('认得出 https 地址', gh && gh.owner === 'cos-cross' && gh.repo === 'cos-cross.github.io', JSON.stringify(gh));
+  ok('认得出 ssh 地址', (() => {
+    const r = parseRemote('git@github.com:cos-cross/cos-cross.github.io.git');
+    return r && r.repo === 'cos-cross.github.io';
+  })());
+  ok('带令牌的 https 也认', (() => {
+    const r = parseRemote('https://x-access-token:ghp_x@github.com/a/b');
+    return r && r.owner === 'a' && r.repo === 'b';
+  })());
+  ok('非 GitHub 返回 null', parseRemote('https://gitlab.com/a/b') === null);
+  ok('乱写返回 null', parseRemote('随便什么') === null && parseRemote('') === null);
+
+  const cfg = ['[core]', '\trepositoryformatversion = 0', '[remote "origin"]',
+    '\turl = git@github.com:cos-cross/cos-cross.github.io.git',
+    '\tfetch = +refs/heads/*:refs/remotes/origin/*', '[branch "main"]', '\tremote = origin', ''].join('\n');
+  ok('从 .git/config 取 origin', remoteFromGitConfig(cfg) === 'git@github.com:cos-cross/cos-cross.github.io.git',
+    String(remoteFromGitConfig(cfg)));
+  ok('没有 origin 时返回 null', remoteFromGitConfig('[core]\n\tbare = false\n') === null);
+
+  const base = releaseBase('cos-cross', 'cos-cross.github.io', 'files');
+  ok('Release 前缀', base === 'https://github.com/cos-cross/cos-cross.github.io/releases/download/files', base);
+  ok('文件名按 URL 段编码', releaseAssetUrl(base, '我的 包.zip') === base + '/%E6%88%91%E7%9A%84%20%E5%8C%85.zip',
+    releaseAssetUrl(base, '我的 包.zip'));
+  ok('前缀结尾多写斜杠也不会双斜杠', releaseAssetUrl(base + '/', 'a.zip') === base + '/a.zip');
+  ok('缺参数返回空串,不会拼出坏链接',
+    releaseBase('', 'r', 't') === '' && releaseAssetUrl('', 'a') === '' && releaseAssetUrl(base, '') === '');
+}
+
 console.log(`\n${pass} 通过,${fail} 失败`);
 process.exit(fail ? 1 : 0);

@@ -57,7 +57,9 @@
 │   ├── verify-live.mjs       # 线上站点验证
 │   ├── verify-plots.mjs      # 线上函数图像专项验证(逐条复算)
 │   ├── sync-mdblog.mjs       # mdblog/ → source/_posts/ 同步
-│   ├── sync-files.mjs        # files/ → source/files/ 同步并生成下载页数据
+│   ├── sync-files.mjs        # files/ + files-big/ → 下载页数据(后者只生成 Release 直链)
+│   ├── release-files.mjs     # 把 files-big/ 里的大文件传到 GitHub Release
+│   ├── files-index.cjs       # 体积档位与 Release 直链拼装(上传端和页面端共用)
 │   ├── import-wallpaper.mjs  # 从 Wallpaper Engine 导入壁纸当背景
 │   ├── import-avatar.mjs     # 从 B 站同步头像 / 网站图标
 │   ├── manage-projects.mjs   # 项目清单校验与生成
@@ -95,7 +97,8 @@ npm install --ignore-scripts
 | `npm run wallpaper -- 2903241954` | 从 Wallpaper Engine 导入壁纸当背景 |
 | `npm run wallpaper -- --list` | 列出本机所有 Wallpaper Engine 壁纸 |
 | `npm run mdblog` | 把 `mdblog/` 里的笔记同步成文章 |
-| `npm run files` | 把 `files/` 里的文件同步上架到 `/files/` |
+| `npm run files` | 同步 `files/`(本站直链)和 `files-big/`(Release 直链)并生成下载页数据 |
+| `npm run files:release` | 把 `files-big/` 里的大文件传到 GitHub Release(需要 `GITHUB_TOKEN`) |
 | `npm run projects -- check` | 校验项目清单(揪出私有仓库) |
 | `npm run projects -- list` | 列出所有公开仓库及收录状态 |
 | `npm run projects -- add <仓库名>` | 从 GitHub 生成一条项目清单骨架 |
@@ -994,13 +997,20 @@ KaTeX 渲染一个公式会吐出**两层文字**:`<span class="katex-mathml">`(
 `.` 里留了 `vscode-plot-preview/` 这条 ignore 规则,纯粹是防线 —— 万一哪天有副本被丢回那个路径,
 不会误提交。
 
-## 文件下载区:`files/` 文件夹
+## 文件下载区:两个文件夹,两档方案
 
-把要分享的文件丢进 `files/`,部署后自动上架到 **`/files/`** 下载页:
+要分享的文件丢进根目录这两个文件夹之一,部署后都会上架到 **`/files/`** 下载页
+(带大小、日期、sha256 前 8 位,顶部可以按文件名筛选):
+
+| 放哪 | 适合 | 文件本体 | 页面上的链接 |
+| --- | --- | --- | --- |
+| `files/` | **< 100 MB** 的(课件、代码包、小工具) | 提交进 git 仓库 | 本站直链 `/files/…`,点开就下、无跳转 |
+| `files-big/` | **> 100 MB 的**(游戏包、大镜像) | **不进仓库**,传到 GitHub Release | Release 直链,页面上标一个 `Release` 角标,新窗口打开 |
 
 ```bash
-npm run files                # 只同步
+npm run files                # 只同步(两个目录都扫)
 npm run files -- --dry-run   # 只看会做什么
+npm run files:release        # 把 files-big/ 里的传上 GitHub Release(需要令牌)
 npm run deploy               # 同步 + 构建 + 发布
 ```
 
@@ -1009,22 +1019,42 @@ files/
 ├── 数学/三角函数速查.pdf   →  /files/数学/三角函数速查.pdf
 ├── 代码/oi-template.zip   →  /files/代码/oi-template.zip
 └── 说明.txt               →  /files/说明.txt
+
+files-big/                  →  不进仓库,直链指向
+└── 游戏/DELTARUNE.zip      →  https://github.com/<你>/<仓库>/releases/download/files/DELTARUNE.zip
 ```
 
-子目录名就是页面上的分组名。每个条目自动带**大小、日期、sha256 前 8 位**,页面顶部有输入框可以按文件名筛选。下载就是直接下,没有登录、没有跳转页、没有限速。
+`npm run build` / `npm run check` / `npm run deploy` 都会自动先跑一次同步。
 
-### ⚠️ 这套方案的硬限制
-
-**它是"把文件提交进 git 仓库",不是对象存储。**
+### ⚠️ 为什么必须分两档(GitHub 的硬限制,不是审美)
 
 | 限制 | 数值 |
 | --- | --- |
-| GitHub 单文件上限 | **100 MB**(超了推不上去,同步时会提醒) |
-| 仓库建议体积 | 1 GB 以内 |
-| 体积放大 | 文件在 `main`(`files/`)和 `gh-pages`(`public/files/`)各存一份,**仓库占用约等于文件体积 ×2** |
+| **git 仓库单文件** | **100 MB 硬上限** —— 超了**整次 push 被拒**(不是跳过那个文件),所以放错地方等于部署直接挂掉 |
+| Release 单个资源 | **2 GB**,而且**不占仓库体积**、不计入 Pages 那 1 GB 的发布体积 |
+| Pages 源仓库 | 建议 ≤ 1 GB;发布出来的站点**不得超过 1 GB**(官方 [Pages limits](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits)) |
+| Pages 部署 | 超过 10 分钟超时;带宽软限制 100 GB/月 |
+| 体积放大 | `files/` 里的文件在 `main` 和 `gh-pages` 各存一份,**仓库占用约等于体积 ×2** |
 
-- ✅ PDF、课件、代码包、图片、字体 —— 没问题
-- ❌ 视频、游戏包、系统镜像 —— 请用真正的对象存储
+所以:
+
+- ✅ `files/`:PDF、课件、代码包、图片、字体,单个 < 100 MB;
+- ⚠️ 单个超过 20 MB,同步时会提醒(仓库体积涨得快);
+- ❌ **> 100 MB 的一律放 `files-big/`**,别放 `files/` —— `tools/deploy.mjs` 出发前会扫一遍
+  `public/`,发现超大文件就直接停下来说清楚怎么办,而不是等 git 推到一半被拒。
+
+### 大文件那套是怎么运转的
+
+1. 把大文件丢进 `files-big/<分组>/<文件名>`;
+2. `npm run files:release` —— 创建(或复用)一个 tag 为 **`files`** 的 Release,把文件传上去,
+   已经传过且大小一致的会**自动跳过**(所以上传断了直接重跑,不会重传 1 GB);
+3. `npm run files` 生成页面数据时,会读 `.git/config` 认出仓库地址,拼出直链写进 `source/_data/files.yml`。
+
+直链的拼装规则**只有一份**(`tools/files-index.cjs`),上传端和页面端共用 ——
+不然两边算出的 URL 一旦不一致,页面上就会挂一堆 404(`tools/test-theme.mjs` 里钉住了这些规则)。
+
+**注意 `files-big/` 已经在 `.gitignore` 里**:它只在本机存在,仓库里不会有它的副本,
+Pages 也不托管它 —— 所以它不占 Pages 那 1 GB,删掉本地文件也不影响 Release 上已有的资源。
 
 ### 为什么不能做"访客上传"
 
@@ -1262,3 +1292,5 @@ profile:
 ## 许可
 
 博客内容(文章、图片)版权归 Cos-Cross 所有;主题代码可以自由参考和使用。
+
+声明: 本站点使用Deepseek搭建

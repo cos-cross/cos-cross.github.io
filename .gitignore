@@ -9,6 +9,9 @@ db.json
 source/files/*
 !source/files/index.md
 
+# ---- 大文件(> 100 MB)不进仓库:放这里,用 `npm run files:release` 传到 GitHub Release ----
+files-big/
+
 # ---- 脚本运行时产生的临时目录 ----
 .deploy-tmp/
 .avatar-tmp/

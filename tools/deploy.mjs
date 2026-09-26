@@ -25,7 +25,7 @@
  * 这样"上次 push 卡在网络/权限上"的仓库,再跑一次就能补推上去。
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -46,6 +46,42 @@ const stamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
 if (!existsSync(path.join(publicDir, 'index.html'))) {
   console.error('public/index.html 不存在,请先运行:npm run build');
   process.exit(1);
+}
+
+/* ---------- 出发前先拦住"推不上去"的情况 ---------- */
+
+/**
+ * GitHub 对 git 仓库的单文件硬上限是 100 MB,超了**整次 push 会被拒绝**
+ * (不是跳过那个文件),而且失败信息是推到最后才出现的,很难查。
+ * 所以这里在动手之前先扫一遍 public/:发现超大文件就直接停下来说清楚怎么办。
+ *
+ * 大文件正确的位置是 files-big/(走 GitHub Release,单个上限 2 GB),
+ * 见 README「资源页」和 tools/release-files.mjs。
+ */
+{
+  const LIMIT = 100 * 1024 * 1024;
+  const tooBig = [];
+  const walk = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else {
+        const size = statSync(full).size;
+        if (size > LIMIT) tooBig.push([path.relative(publicDir, full), size]);
+      }
+    }
+  };
+  if (existsSync(publicDir)) walk(publicDir);
+  if (tooBig.length) {
+    console.error('✗ public/ 里有超过 100 MB 的文件,推上去会被 GitHub 整次拒绝:');
+    for (const [rel, size] of tooBig) {
+      console.error(`    ${rel}  ${(size / 1048576).toFixed(1)} MB`);
+    }
+    console.error('\n把它们从 files/ 挪到 files-big/(gitignore 已配好),然后:');
+    console.error('    npm run files:release    # 传到 GitHub Release');
+    console.error('    npm run files            # 重新生成资源页数据(会自动删掉 public/ 里的旧副本)');
+    process.exit(1);
+  }
 }
 
 /* ---------- 仓库地址 ---------- */

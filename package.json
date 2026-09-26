@@ -17,6 +17,7 @@
     "verify:plots": "node tools/verify-plots.mjs",
     "mdblog": "node tools/sync-mdblog.mjs",
     "files": "node tools/sync-files.mjs",
+    "files:release": "node tools/release-files.mjs",
     "projects": "node tools/manage-projects.mjs",
     "avatar": "node tools/import-avatar.mjs",
     "wallpaper": "node tools/import-wallpaper.mjs",

@@ -54,11 +54,23 @@
 
     <ul class="file-list">
       <% groups[groupName].forEach(function (f) { %>
+      <%
+        // external: true 的条目本体在 GitHub Release 上(见 tools/release-files.mjs)。
+        // 这类链接是绝对地址,不能过 url_for;跨域也吃不到 download 属性,
+        // 所以新窗口打开,并标一个小「Release」角标说明它不在本站。
+        var isRemote = !!f.external;
+        var href = isRemote ? f.url : url_for(f.url);
+      %>
       <li class="file-item" data-name="<%= f.name.toLowerCase() %>">
-        <a class="file-link" href="<%= url_for(f.url) %>" download>
+        <%# 这两个属性必须写成真正的标签属性,不要用 EJS 的等号输出拼字符串:
+            等号会把引号转义成 &#34;,target 就变成一个叫 "_blank" 的框架名,点了不开新窗口 %>
+        <a class="file-link" href="<%= href %>"<% if (isRemote) { %> target="_blank" rel="noopener noreferrer"<% } else { %> download<% } %>>
           <span class="file-ext"><%= (f.name.split('.').pop() || '?').slice(0, 4).toUpperCase() %></span>
           <span class="file-main">
-            <span class="file-name"><%= f.name %></span>
+            <span class="file-name">
+              <%= f.name %>
+              <% if (isRemote) { %><span class="mini-tag file-remote">Release</span><% } %>
+            </span>
             <span class="file-meta">
               <span><%= f.size %></span>
               <span class="file-dot">·</span>
@@ -69,7 +81,7 @@
           </span>
           <span class="file-download">
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v9.6l3.3-3.3 1.4 1.4L12 17.4l-5.7-5.7 1.4-1.4L11 13.6V4a1 1 0 0 1 1-1zM5 19h14v2H5z" fill="currentColor"/></svg>
-            <span>下载</span>
+            <span><%= isRemote ? '去 GitHub' : '下载' %></span>
           </span>
         </a>
       </li>
@@ -85,7 +97,7 @@
   <div class="empty-state">
     <span class="empty-icon" aria-hidden="true">↓</span>
     <p class="empty-title">还没有可下载的文件</p>
-    <p class="empty-desc">把文件放进仓库根目录的 <b>files/</b> 文件夹,部署后就会出现在这里。</p>
+    <p class="empty-desc">把文件放进 <b>files/</b>(小文件,本站直链)或 <b>files-big/</b>(超过 100 MB 的大文件,走 GitHub Release),部署后就会出现在这里。</p>
   </div>
 </div>
 <% } %>
