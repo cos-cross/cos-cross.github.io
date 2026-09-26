@@ -31,8 +31,8 @@ date: 2026-04-10 20:00:00
 
 ## Find Me
 
-- **GitHub**:[cos-cross](https://github.com/cos-cross)
-- **Bilibili**:[@Cos_Cross](https://space.bilibili.com/388480733)
+- **GitHub**: {% social_badge GitHub %}
+- **Bilibili**: {% social_badge Bilibili %}
 - **邮箱**: Cosinecross@163.com
 
 <div class="callout">

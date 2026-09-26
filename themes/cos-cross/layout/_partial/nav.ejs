@@ -29,7 +29,7 @@
       <% }); %>
       <div class="nav-menu-foot">
         <% (theme.social || []).forEach(function (item) { %>
-        <%- partial('_partial/social-badge', { item: item, cls: 'nav-social' }) %>
+        <a class="nav-social" href="<%= item.link %>" target="_blank" rel="noopener noreferrer"><%= item.name %></a>
         <% }); %>
       </div>
     </nav>

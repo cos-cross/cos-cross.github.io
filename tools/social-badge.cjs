@@ -83,4 +83,38 @@ function badgeUrl(item) {
     + '?' + params.join('&');
 }
 
-module.exports = { badgeUrl, escapeSegment, messageFromLink, BADGE_BASE };
+/** HTML 属性转义(名字/链接来自配置,仍然按最坏情况处理) */
+function escapeAttr(text) {
+  return String(text == null ? '' : text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * 在 social 列表里找一项:先全名精确匹配(不分大小写),再退到"包含",最后允许用 1 起的序号。
+ * 用于 {% social_badge GitHub %} 这种写法。
+ */
+function findSocial(list, wanted) {
+  const items = Array.isArray(list) ? list : [];
+  const want = String(wanted == null ? '' : wanted).trim().toLowerCase();
+  if (!want) return null;
+  const nameOf = (it) => String((it && it.name) == null ? '' : it.name).trim().toLowerCase();
+  return items.find((it) => nameOf(it) === want)
+    || items.find((it) => nameOf(it).indexOf(want) !== -1)
+    || (/^\d+$/.test(want) ? items[Number(want) - 1] : null)
+    || null;
+}
+
+/** 一项 → 可点的徽章标记(正文里用,和页脚那种一行文字链接是两回事) */
+function badgeHtml(item) {
+  const it = item || {};
+  const label = escapeAttr(it.name || 'link');
+  return '<a class="social-badge-link" href="' + escapeAttr(it.link) + '"'
+    + ' target="_blank" rel="noopener noreferrer" title="' + label + '">'
+    + '<img class="social-badge" src="' + escapeAttr(badgeUrl(it)) + '"'
+    + ' alt="' + label + '" height="20" loading="lazy" decoding="async"></a>';
+}
+
+module.exports = { badgeUrl, badgeHtml, findSocial, escapeSegment, messageFromLink, BADGE_BASE };

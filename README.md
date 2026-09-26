@@ -1132,16 +1132,24 @@ GITHUB_TOKEN=ghp_xxx npm run deploy
 | 页脚「已经坚持了 N 天」 | 主题配置 → `text.footer_days` |
 | 页脚三列标题(导航/找到我/订阅) | 主题配置 → `text.footer_col_nav` / `footer_col_find` / `footer_col_sub` |
 | 页脚右下角彩蛋 `ALL PERFECT` | 主题配置 → `text.footer_combo`(留空则整块隐藏) |
-| 页脚「找到我」和手机菜单底部的社交链接 | 主题配置 → `social`(渲染成 shields.io 徽章,见下) |
+| 页脚「找到我」和手机菜单底部的社交链接 | 主题配置 → `social`(**保持原来的「图标 + 文字」样式,没有改成徽章**) |
 
-#### 社交链接是 shields.io 徽章
+#### 正文里的社交徽章:`{% social_badge GitHub %}`
 
-页脚「找到我」和手机端菜单底部显示的不是纯文字,而是 shields.io 的 **flat-square 静态徽章**
-(标签 + 右边那句 + 品牌色 + 图标),编 URL 的逻辑在 `tools/social-badge.cjs`,单测在 `tools/test-theme.mjs`:
+**页脚和手机菜单不参与** —— 那两处是站点自己的门面,仍是「图标 + 文字」。
+徽章只用在**正文**里,通过标签调用(「关于」页的 Find Me、项目页那行仓库地址都是这么来的):
+
+```markdown
+- **GitHub**: {% social_badge GitHub %}
+- **Bilibili**: {% social_badge Bilibili %}
+```
+
+名字从主题配置 `social` 里找(不分大小写,写一半也能匹配,也可以用序号 `{% social_badge 1 %}`),
+所以**改 handle、换配色、换图标都只改配置**,不用回头翻文章:
 
 ```yaml
 social:
-  - name: GitHub            # 徽章左边的标签
+  - name: GitHub            # 徽章左边的标签,也是 {% social_badge %} 里写的名字
     icon: github            # 图标;Simple Icons 里没有的(mail / link)自动不带图标
     link: https://github.com/cos-cross
     badge: cos-cross        # 徽章右边的文字;留空则从 link 里推(github.com/cos-cross)
@@ -1150,13 +1158,17 @@ social:
     # badge_logo: none            # 想单独控制图标时用这个
 ```
 
-**为什么单测是必要的**:徽章路径要遵守 shields.io 的转义规则(`-`→`--`、`_`→`__`、空格→`_`)。
-写错了页面照样出图,只是文字被截断(`cos-cross` 变成 `cos`),肉眼很难发现。
+名字写错时**不会静默少一块** —— 构建日志里会有一条 `social_badge: 主题配置 social 里没有「xxx」这一项`。
+
+URL 拼装和转义规则在 `tools/social-badge.cjs`,单测在 `tools/test-theme.mjs`。
+**为什么值得单测**:shields.io 的路径要遵守它自己的转义规则(`-`→`--`、`_`→`__`、空格→`_`)。
+写错了页面照样出图,只是文字被截断(`cos-cross` 显示成 `cos`、`@Cos_Cross` 显示成 `@Cos Cross`),
+肉眼扫一遍很难发现。
 
 **代价**:徽章是**访问者浏览器里**去 `img.shields.io` 现取的静态 SVG,不是构建期下载进来的。
-好处是改 `badge:` / `badge_color:` 不用重新构建也不会构建失败;代价是**墙内 / 断网时可能加载不出来**
-(那时页面就只剩三个空链接)。想彻底不依赖外网,就把这几个 SVG 下到 `source/img/badges/`
-再改成相对路径 —— 模板只认 `social_badge_url()` 返回的字符串,换成自己的 URL 一样能用。
+好处是改配置不用重新构建也不会构建失败;代价是**墙内 / 断网时可能加载不出来**
+(那时那一行就只剩前面的粗体标签)。想彻底不依赖外网,就把这几个 SVG 下到 `source/img/badges/`,
+然后把 `social_badge` 标签的输出换成自己的图片地址 —— 模板和标签都只认 `badgeHtml()` 返回的字符串。
 
 三个好用的点:
 
@@ -1223,7 +1235,7 @@ profile:
 
 - GitHub:[cos-cross](https://github.com/cos-cross)
 - Bilibili:[@Cos_Cross](https://space.bilibili.com/388480733)
-- 邮箱:coscross@126.com
+- 邮箱:Cosinecross@163.com
 - 小工具站:[IdealizedPreviewer](https://cos-cross.github.io/IdealizedPreviewer/)
 
 ## 许可
