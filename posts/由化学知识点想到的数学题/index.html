@@ -181,15 +181,16 @@
 <p>但第三个问题却是第二个问题在极值时构造, 看上去难度肯定比前两个要简单不少</p>
 <div class="plot" data-kind="3d" data-mount>
   <div class="plot-bar">
-    <span class="plot-kind">3D · 4 个曲面 · 4 个点</span>
+    <span class="plot-kind">3D · 4 个曲面 · 半透明 62% · 4 个点</span>
     <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
     <span class="plot-actions">
       <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="alpha" aria-pressed="false">半透明</button>
       <button type="button" data-plot-action="save">存为 PNG</button>
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"implicit","expr":"(x-1)^2+y^2+z^2=3/4","constraints":[]},{"type":"implicit","expr":"(x+1/2)^2+(y-sqrt(3)/2)^2+z^2=3/4","constraints":[]},{"type":"implicit","expr":"(x+1/2)^2+(y+sqrt(3)/2)^2+z^2=3/4","constraints":[]},{"type":"implicit","expr":"x^2+y^2+(z-sqrt(2))^2=3/4","constraints":[]},{"type":"point","x":0,"y":0,"z":1.4142135623730951,"label":"A","constraints":[]},{"type":"point","x":1,"y":0,"z":0,"label":"B","constraints":[]},{"type":"point","x":-0.5,"y":0.8660254037844386,"z":0,"label":"C","constraints":[]},{"type":"point","x":-0.5,"y":-0.8660254037844386,"z":0,"label":"D","constraints":[]}],"opts":{"x":[-4,4],"y":[-4,4],"z":[-4,4],"grid":32}}</script>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"(x-1)^2+y^2+z^2=3/4","constraints":[]},{"type":"implicit","expr":"(x+1/2)^2+(y-sqrt(3)/2)^2+z^2=3/4","constraints":[]},{"type":"implicit","expr":"(x+1/2)^2+(y+sqrt(3)/2)^2+z^2=3/4","constraints":[]},{"type":"implicit","expr":"x^2+y^2+(z-sqrt(2))^2=3/4","constraints":[]},{"type":"point","x":0,"y":0,"z":1.4142135623730951,"label":"A","constraints":[]},{"type":"point","x":1,"y":0,"z":0,"label":"B","constraints":[]},{"type":"point","x":-0.5,"y":0.8660254037844386,"z":0,"label":"C","constraints":[]},{"type":"point","x":-0.5,"y":-0.8660254037844386,"z":0,"label":"D","constraints":[]}],"opts":{"x":[-4,4],"y":[-4,4],"z":[-4,4],"grid":32,"alpha":0.62}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>point(0, 0, sqrt(2)) A
 point(1, 0, 0) B
 point(-1/2, sqrt(3)/2, 0) C
@@ -358,7 +359,7 @@ RSS / Atom</a></li>
   <!-- 只有含函数图像的页面才加载绘图代码。
        ?v= 是缓存版本号:payload 结构变过(加了约束和点),不带版本号的话
        浏览器可能拿旧缓存去配新页面,图会画错甚至报错。 -->
-  <script src="/js/plot.js?v=4"></script>
+  <script src="/js/plot.js?v=5"></script>
   
 </body>
 </html>

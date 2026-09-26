@@ -1639,6 +1639,13 @@ p { margin: 0; }
   transition: all .2s var(--ease);
 }
 .plot-actions button:hover { color: var(--cyan); border-color: var(--cyan); }
+/* 半透明开关按下时的状态 */
+.plot-actions button.is-on {
+  color: #07070f;
+  border-color: transparent;
+  background: var(--grad-main);
+}
+.plot-actions button.is-on:hover { color: #07070f; }
 
 .plot-stage {
   position: relative;

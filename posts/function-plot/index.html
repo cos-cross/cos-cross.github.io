@@ -148,8 +148,12 @@
       
       <span class="meta-item">
 <svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm1 3v5.6l3.7 2.1-1 1.7L11 13.7V7z" fill="currentColor"/></svg>
-约 27 分钟</span>
+约 32 分钟</span>
       
+      
+      <span class="meta-item meta-updated">
+<svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z" fill="currentColor"/></svg>
+更新于 2026-09-26</span>
       
       
       <span class="meta-item">
@@ -178,7 +182,7 @@
     <aside class="post-toc" id="post-toc" aria-label="目录">
       <div class="toc-card">
         <div class="toc-title"><span class="toc-bar"></span>目录</div>
-        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%88%E7%9C%8B%E6%95%88%E6%9E%9C"><span class="toc-text">先看效果</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E7%94%A8%E7%8E%B0%E6%88%90%E7%9A%84%E5%BA%93"><span class="toc-text">为什么不用现成的库</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%87%A0%E4%B8%AA%E5%AE%9E%E7%8E%B0%E7%BB%86%E8%8A%82"><span class="toc-text">几个实现细节</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%8E%E4%B9%88%E7%94%A8"><span class="toc-text">怎么用</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%BF%98%E6%94%AF%E6%8C%81%E9%9A%90%E5%BC%8F%E6%96%B9%E7%A8%8B"><span class="toc-text">还支持隐式方程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%A4%E7%A7%8D%E6%96%B9%E7%A8%8B%E8%83%8C%E5%90%8E%E6%98%AF%E4%B8%A4%E5%A5%97%E5%AE%8C%E5%85%A8%E4%B8%8D%E5%90%8C%E7%9A%84%E7%AE%97%E6%B3%95"><span class="toc-text">两种方程背后是两套完全不同的算法</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%80%89%E9%A1%B9%E4%B8%8A%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="toc-text">选项上的区别</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BA%A6%E6%9D%9F%E6%9D%A1%E4%BB%B6-%E6%8A%8A%E5%9B%BE%E5%BD%A2%E8%A3%81%E6%88%90%E4%BD%A0%E6%83%B3%E8%A6%81%E7%9A%84%E9%82%A3%E4%B8%80%E5%9D%97"><span class="toc-text">约束条件:把图形裁成你想要的那一块</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8F%AA%E5%86%99%E7%BA%A6%E6%9D%9F%E6%9D%A1%E4%BB%B6-%E7%94%BB%E5%8C%BA%E5%9F%9F"><span class="toc-text">只写约束条件 &#x3D; 画区域</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BA%A6%E6%9D%9F%E6%98%AF%E6%80%8E%E4%B9%88%E5%AE%9E%E7%8E%B0%E7%9A%84"><span class="toc-text">约束是怎么实现的</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8D%95%E7%8B%AC%E7%9A%84%E7%82%B9"><span class="toc-text">单独的点</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BB%99%E6%AF%8F%E6%9D%A1%E6%9B%B2%E7%BA%BF%E5%8D%95%E7%8B%AC%E5%AE%9A%E5%88%B6%E7%BA%A6%E6%9D%9F"><span class="toc-text">给每条曲线单独定制约束</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%A8%E5%B1%80%E5%92%8C%E5%B1%80%E9%83%A8%E6%98%AF%E5%8F%A0%E5%8A%A0%E7%9A%84-%E4%B8%8D%E6%98%AF%E8%A6%86%E7%9B%96"><span class="toc-text">全局和局部是叠加的,不是覆盖</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%AF%8F%E4%B8%AA%E7%82%B9%E4%B9%9F%E5%8F%AF%E4%BB%A5%E6%9C%89%E8%87%AA%E5%B7%B1%E7%9A%84%E7%BA%A6%E6%9D%9F"><span class="toc-text">每个点也可以有自己的约束</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%A4%E4%BA%92"><span class="toc-text">交互</span></a></li></ol>
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%88%E7%9C%8B%E6%95%88%E6%9E%9C"><span class="toc-text">先看效果</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E7%94%A8%E7%8E%B0%E6%88%90%E7%9A%84%E5%BA%93"><span class="toc-text">为什么不用现成的库</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%87%A0%E4%B8%AA%E5%AE%9E%E7%8E%B0%E7%BB%86%E8%8A%82"><span class="toc-text">几个实现细节</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%8E%E4%B9%88%E7%94%A8"><span class="toc-text">怎么用</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%BF%98%E6%94%AF%E6%8C%81%E9%9A%90%E5%BC%8F%E6%96%B9%E7%A8%8B"><span class="toc-text">还支持隐式方程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8D%8A%E9%80%8F%E6%98%8E"><span class="toc-text">半透明</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%A4%E7%A7%8D%E6%96%B9%E7%A8%8B%E8%83%8C%E5%90%8E%E6%98%AF%E4%B8%A4%E5%A5%97%E5%AE%8C%E5%85%A8%E4%B8%8D%E5%90%8C%E7%9A%84%E7%AE%97%E6%B3%95"><span class="toc-text">两种方程背后是两套完全不同的算法</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%80%89%E9%A1%B9%E4%B8%8A%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="toc-text">选项上的区别</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BA%A6%E6%9D%9F%E6%9D%A1%E4%BB%B6-%E6%8A%8A%E5%9B%BE%E5%BD%A2%E8%A3%81%E6%88%90%E4%BD%A0%E6%83%B3%E8%A6%81%E7%9A%84%E9%82%A3%E4%B8%80%E5%9D%97"><span class="toc-text">约束条件:把图形裁成你想要的那一块</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8F%AA%E5%86%99%E7%BA%A6%E6%9D%9F%E6%9D%A1%E4%BB%B6-%E7%94%BB%E5%8C%BA%E5%9F%9F"><span class="toc-text">只写约束条件 &#x3D; 画区域</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BA%A6%E6%9D%9F%E6%98%AF%E6%80%8E%E4%B9%88%E5%AE%9E%E7%8E%B0%E7%9A%84"><span class="toc-text">约束是怎么实现的</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8D%95%E7%8B%AC%E7%9A%84%E7%82%B9"><span class="toc-text">单独的点</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BB%99%E6%AF%8F%E6%9D%A1%E6%9B%B2%E7%BA%BF%E5%8D%95%E7%8B%AC%E5%AE%9A%E5%88%B6%E7%BA%A6%E6%9D%9F"><span class="toc-text">给每条曲线单独定制约束</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%A8%E5%B1%80%E5%92%8C%E5%B1%80%E9%83%A8%E6%98%AF%E5%8F%A0%E5%8A%A0%E7%9A%84-%E4%B8%8D%E6%98%AF%E8%A6%86%E7%9B%96"><span class="toc-text">全局和局部是叠加的,不是覆盖</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%AF%8F%E4%B8%AA%E7%82%B9%E4%B9%9F%E5%8F%AF%E4%BB%A5%E6%9C%89%E8%87%AA%E5%B7%B1%E7%9A%84%E7%BA%A6%E6%9D%9F"><span class="toc-text">每个点也可以有自己的约束</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%A4%E4%BA%92"><span class="toc-text">交互</span></a></li></ol>
         <div class="toc-progress"><span class="toc-progress-bar" id="toc-progress-bar"></span></div>
       </div>
     </aside>
@@ -229,11 +233,12 @@ cos(x)
     <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
     <span class="plot-actions">
       <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="alpha" aria-pressed="false">半透明</button>
       <button type="button" data-plot-action="save">存为 PNG</button>
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"explicit","expr":"sin(sqrt(x^2+y^2))","constraints":[]}],"opts":{"x":[-5,5],"y":[-5,5],"z":null,"grid":54}}</script>
+  <script type="application/json">{"items":[{"type":"explicit","expr":"sin(sqrt(x^2+y^2))","constraints":[]}],"opts":{"x":[-5,5],"y":[-5,5],"z":null,"grid":54,"alpha":1}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>sin(sqrt(x^2+y^2))
 </pre></details>
 </div>
@@ -245,11 +250,12 @@ cos(x)
     <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
     <span class="plot-actions">
       <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="alpha" aria-pressed="false">半透明</button>
       <button type="button" data-plot-action="save">存为 PNG</button>
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"explicit","expr":"exp(-(x^2+y^2)/2)","constraints":[]}],"opts":{"x":[-3,3],"y":[-3,3],"z":null,"grid":54}}</script>
+  <script type="application/json">{"items":[{"type":"explicit","expr":"exp(-(x^2+y^2)/2)","constraints":[]}],"opts":{"x":[-3,3],"y":[-3,3],"z":null,"grid":54,"alpha":1}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>exp(-(x^2+y^2)/2)
 </pre></details>
 </div>
@@ -261,11 +267,12 @@ cos(x)
     <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
     <span class="plot-actions">
       <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="alpha" aria-pressed="false">半透明</button>
       <button type="button" data-plot-action="save">存为 PNG</button>
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"explicit","expr":"sin(x)*cos(y)","constraints":[]}],"opts":{"x":[-6,6],"y":[-6,6],"z":null,"grid":64}}</script>
+  <script type="application/json">{"items":[{"type":"explicit","expr":"sin(x)*cos(y)","constraints":[]}],"opts":{"x":[-6,6],"y":[-6,6],"z":null,"grid":64,"alpha":1}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>sin(x)*cos(y)
 </pre></details>
 </div>
@@ -379,11 +386,12 @@ x^2/2 - y^2 = 1
     <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
     <span class="plot-actions">
       <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="alpha" aria-pressed="false">半透明</button>
       <button type="button" data-plot-action="save">存为 PNG</button>
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":[]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":34}}</script>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":[]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":34,"alpha":1}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 + z^2 = 1
 </pre></details>
 </div>
@@ -395,11 +403,12 @@ x^2/2 - y^2 = 1
     <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
     <span class="plot-actions">
       <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="alpha" aria-pressed="false">半透明</button>
       <button type="button" data-plot-action="save">存为 PNG</button>
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"implicit","expr":"(x^2 + y^2 + z^2 + 0.6)^2 = 4*(x^2 + y^2)","constraints":[]}],"opts":{"x":[-2.4,2.4],"y":[-2.4,2.4],"z":[-2.4,2.4],"grid":36}}</script>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"(x^2 + y^2 + z^2 + 0.6)^2 = 4*(x^2 + y^2)","constraints":[]}],"opts":{"x":[-2.4,2.4],"y":[-2.4,2.4],"z":[-2.4,2.4],"grid":36,"alpha":1}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>(x^2 + y^2 + z^2 + 0.6)^2 = 4*(x^2 + y^2)
 </pre></details>
 </div>
@@ -421,6 +430,53 @@ sin(x)
 </pre></details>
 </div>
 
+<p>一张图里还能叠<strong>多个</strong>曲面&#x2F;等值面。下面这个是正四面体四个顶点上各放一个球,两两相切(球心间距正好是 <code>2r</code>):</p>
+<div class="plot" data-kind="3d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">3D · 4 个曲面 · 半透明 62% · 4 个点</span>
+    <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="alpha" aria-pressed="false">半透明</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"(x-1)^2+y^2+z^2=3/4","constraints":[]},{"type":"implicit","expr":"(x+1/2)^2+(y-sqrt(3)/2)^2+z^2=3/4","constraints":[]},{"type":"implicit","expr":"(x+1/2)^2+(y+sqrt(3)/2)^2+z^2=3/4","constraints":[]},{"type":"implicit","expr":"x^2+y^2+(z-sqrt(2))^2=3/4","constraints":[]},{"type":"point","x":0,"y":0,"z":1.4142135623730951,"label":"A","constraints":[]},{"type":"point","x":1,"y":0,"z":0,"label":"B","constraints":[]},{"type":"point","x":-0.5,"y":0.8660254037844386,"z":0,"label":"C","constraints":[]},{"type":"point","x":-0.5,"y":-0.8660254037844386,"z":0,"label":"D","constraints":[]}],"opts":{"x":[-4,4],"y":[-4,4],"z":[-4,4],"grid":34,"alpha":0.62}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>point(0, 0, sqrt(2)) A
+point(1, 0, 0) B
+point(-1/2, sqrt(3)/2, 0) C
+point(-1/2, -sqrt(3)/2, 0) D
+(x-1)^2+y^2+z^2=3/4
+(x+1/2)^2+(y-sqrt(3)/2)^2+z^2=3/4
+(x+1/2)^2+(y+sqrt(3)/2)^2+z^2=3/4
+x^2+y^2+(z-sqrt(2))^2=3/4
+</pre></details>
+</div>
+
+<p>多曲面时<strong>按曲面轮流换色</strong>(而不是按高度渐变),一眼能看出哪块是哪个式子。</p>
+<h3 id="半透明"><a href="#半透明" class="headerlink" title="半透明"></a>半透明</h3><p>四个球叠在一起,如果全是不透明的,前面的球会把后面的挡掉大半。所以<strong>多个曲面默认就是半透明的</strong>,工具条上那个「半透明」按钮可以来回切。</p>
+<p>也可以自己指定透明度(0.05 ~ 1):</p>
+<div class="plot" data-kind="3d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">3D · 2 个曲面 · 半透明 35%</span>
+    <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="alpha" aria-pressed="false">半透明</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":[]},{"type":"implicit","expr":"x^2 + y^2 + z^2 = 3","constraints":[]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":32,"alpha":0.35}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 + z^2 = 1
+x^2 + y^2 + z^2 = 3
+</pre></details>
+</div>
+
+<p><code>alpha=</code> 越小越透。单个曲面默认不透明(实心的球好看),想要玻璃球写 <code>alpha=0.5</code> 就行。</p>
+<p>半透明不是”整张图统一压一个 alpha”那么简单 —— 那样只能看到球正面那一层,背面被同色的正面盖住,反而没有透明的感觉。这里的做法是<strong>每个四边形各自带 alpha、按深度从远到近画</strong>,所以近处的面会真的和远处的面叠在一起。</p>
+<p>代价是不能再靠”同色描边”去压相邻面之间的缝了(每条棱都会再叠一层 alpha,整张网格线会浮出来),所以半透明时改成把每个面从重心往外撑开 0.6 像素,让相邻面互相咬住。另外半透明时着色也会少压暗一点,不然深色背景下几乎看不见。</p>
 <h3 id="两种方程背后是两套完全不同的算法"><a href="#两种方程背后是两套完全不同的算法" class="headerlink" title="两种方程背后是两套完全不同的算法"></a>两种方程背后是两套完全不同的算法</h3><table>
 <thead>
 <tr>
@@ -453,16 +509,17 @@ sin(x)
     <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
     <span class="plot-actions">
       <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="alpha" aria-pressed="false">半透明</button>
       <button type="button" data-plot-action="save">存为 PNG</button>
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":[]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":34}}</script>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":[]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":34,"alpha":1}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 + z^2 = 1
 </pre></details>
 </div>
 
-<p><code>grid</code> 对隐式 3D 建议不要开太高(默认 28):曲面网格的四边形数量是显式高度场的好几倍,开太高拖动会掉帧。</p>
+<p><code>grid</code> 对隐式 3D 建议不要开太高(默认 32):曲面网格的四边形数量是显式高度场的好几倍,开太高拖动会掉帧。</p>
 <h2 id="约束条件-把图形裁成你想要的那一块"><a href="#约束条件-把图形裁成你想要的那一块" class="headerlink" title="约束条件:把图形裁成你想要的那一块"></a>约束条件:把图形裁成你想要的那一块</h2><p><strong>只要一行里出现 <code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code>,它就自动被当成约束条件</strong> —— 约束会裁掉其他所有图形(曲线、方程、曲面)落在区域外的部分。不需要什么新语法。</p>
 <p>上半球,一行搞定:</p>
 <div class="plot" data-kind="3d" data-mount>
@@ -471,11 +528,12 @@ sin(x)
     <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
     <span class="plot-actions">
       <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="alpha" aria-pressed="false">半透明</button>
       <button type="button" data-plot-action="save">存为 PNG</button>
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":["z > 0"]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":34}}</script>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":["z > 0"]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":34,"alpha":1}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 + z^2 = 1
 z &gt; 0
 </pre></details>
@@ -488,11 +546,12 @@ z &gt; 0
     <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
     <span class="plot-actions">
       <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="alpha" aria-pressed="false">半透明</button>
       <button type="button" data-plot-action="save">存为 PNG</button>
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":["z > 0","x + y \u003c 0"]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":32}}</script>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":["z > 0","x + y \u003c 0"]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":32,"alpha":1}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 + z^2 = 1
 z &gt; 0
 x + y &lt; 0
@@ -609,11 +668,12 @@ point(pi, 0) B
     <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
     <span class="plot-actions">
       <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="alpha" aria-pressed="false">半透明</button>
       <button type="button" data-plot-action="save">存为 PNG</button>
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":["z >= 0"]},{"type":"point","x":1,"y":0,"z":0,"label":"X","constraints":["z >= 0"]},{"type":"point","x":0,"y":1,"z":0,"label":"Y","constraints":["z >= 0"]},{"type":"point","x":0,"y":0,"z":1,"label":"Z","constraints":["z >= 0"]},{"type":"point","x":0,"y":0,"z":-1,"label":"看不见","constraints":["z >= 0"]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":30}}</script>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":["z >= 0"]},{"type":"point","x":1,"y":0,"z":0,"label":"X","constraints":["z >= 0"]},{"type":"point","x":0,"y":1,"z":0,"label":"Y","constraints":["z >= 0"]},{"type":"point","x":0,"y":0,"z":1,"label":"Z","constraints":["z >= 0"]},{"type":"point","x":0,"y":0,"z":-1,"label":"看不见","constraints":["z >= 0"]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":30,"alpha":1}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 + z^2 = 1
 z &gt;= 0
 point(1, 0, 0) X
@@ -683,11 +743,12 @@ y = x where x^2 + y^2 &gt; 1
     <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
     <span class="plot-actions">
       <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="alpha" aria-pressed="false">半透明</button>
       <button type="button" data-plot-action="save">存为 PNG</button>
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":["z > 0"]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":34}}</script>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":["z > 0"]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":34,"alpha":1}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 + z^2 = 1 where z &gt; 0
 </pre></details>
 </div>
@@ -752,6 +813,7 @@ point(-2, 0) 这个看不到 where x &gt; 0
 <li><strong>3D</strong>:拖动旋转、滚轮缩放、双击重置</li>
 <li><strong>触屏</strong>:单指拖动、双指捏合缩放</li>
 <li>右上角有「重置」和「存为 PNG」—— 写作业要用图的话直接存下来</li>
+<li><strong>3D</strong> 还有「半透明」开关:球套球、多个曲面互相遮挡的时候按一下就能看穿</li>
 </ul>
 <p>绘制代码只在<strong>含图像的页面</strong>加载,其他页面完全不受影响。</p>
 
@@ -906,7 +968,7 @@ RSS / Atom</a></li>
   <!-- 只有含函数图像的页面才加载绘图代码。
        ?v= 是缓存版本号:payload 结构变过(加了约束和点),不带版本号的话
        浏览器可能拿旧缓存去配新页面,图会画错甚至报错。 -->
-  <script src="/js/plot.js?v=4"></script>
+  <script src="/js/plot.js?v=5"></script>
   
 </body>
 </html>
