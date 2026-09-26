@@ -1,0 +1,33 @@
+{
+  "name": "plot-preview",
+  "displayName": "函数图像预览(plot2d / plot3d)",
+  "description": "在 VSCode 自带的 Markdown 预览里直接渲染 plot2d / plot3d 代码块,和博客用的是同一个渲染核心。",
+  "version": "1.0.0",
+  "publisher": "cos-cross",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "markdown",
+    "plot",
+    "math",
+    "canvas"
+  ],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "markdown.previewStyles": [
+      "./preview/plot.css"
+    ],
+    "markdown.previewScripts": [
+      "./preview/plot.js",
+      "./preview/bootstrap.js"
+    ]
+  }
+}

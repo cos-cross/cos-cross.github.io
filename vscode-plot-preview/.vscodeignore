@@ -1,0 +1,4 @@
+# 打包时不用带进去的东西
+.gitignore
+.vscode/**
+*.vsix
