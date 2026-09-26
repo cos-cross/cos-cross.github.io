@@ -355,6 +355,52 @@
     return { args: splitTopLevel(text.slice(open + 1, close)) };
   }
 
+  /** 把一段文本当常量表达式算出来(球心坐标、半径这些都用它) */
+  function evalConst(src, what) {
+    const label = what || '坐标';
+    let v;
+    try {
+      v = compileAst(parse(String(src).trim()), [])(makeScope([]));
+    } catch (e) {
+      // 加上下文,不然「未知符号:x」看不出是哪个参数出的问题。
+      // 这里的变量表永远是空的,编译器那句「(可用变量:)」读起来莫名其妙,顺手换掉。
+      const msg = String(e.message).replace('(可用变量:)', '(这里只能写常量,不能用变量)');
+      throw new Error(label + '不对:' + msg);
+    }
+    if (!Number.isFinite(v)) throw new Error(label + '算不出有限值:' + src);
+    return v;
+  }
+
+  /**
+   * 打印一个数,顺手把浮点噪声抹掉。
+   * `sqrt(2)^2` 在双精度里是 2.0000000000000004,直接写进方程里很难看;
+   * 1e-12 以内的偏差没有任何几何意义,按整数显示。
+   */
+  function fmtNum(v) {
+    if (Number.isInteger(v)) return String(v);
+    const r = Math.round(v);
+    if (Math.abs(v - r) < 1e-12) return String(r);
+    const p = Number(v.toPrecision(12));
+    return String(p);
+  }
+
+  /**
+   * 球面:给定球心和半径,展开成隐式方程
+   *   (x-a)² + (y-b)² + (z-c)² = r²
+   *
+   * 为什么要展开成方程、而不是另开一种图元:
+   * 展开之后走的就是现成的等值面那条路 —— surface nets 提取、`where` 裁剪、
+   * 多曲面深度排序、半透明……全都不用改一行。少一条代码路径就少一类 bug。
+   */
+  function sphereEquation(center, radius) {
+    if (!(radius > 0)) throw new Error('球的半径要大于 0,现在是 ' + radius);
+    const axis = (name, c) => {
+      if (c === 0) return name;
+      return c < 0 ? `(${name}+${fmtNum(-c)})` : `(${name}-${fmtNum(c)})`;
+    };
+    return `${axis('x', center.x)}^2+${axis('y', center.y)}^2+${axis('z', center.z)}^2=${fmtNum(radius * radius)}`;
+  }
+
   /**
    * 线段/多边形的顶点有两种写法:
    *   A           —— 引用同一块里 `point(...) A` 定义的标签
@@ -363,13 +409,8 @@
    */
   function parseCoordRef(arg) {
     const s = String(arg).trim();
-    const ev = (c) => {
-      const v = compileAst(parse(c), [])(makeScope([]));
-      if (!Number.isFinite(v)) throw new Error('坐标算不出有限值:' + c);
-      return v;
-    };
     if (s.startsWith('(') && s.endsWith(')')) {
-      const vals = splitTopLevel(s.slice(1, -1)).map(ev);
+      const vals = splitTopLevel(s.slice(1, -1)).map((c) => evalConst(c));
       if (vals.length < 2 || vals.length > 3) throw new Error('坐标要写两个或三个:' + s);
       return { coords: { x: vals[0], y: vals[1], z: vals.length > 2 ? vals[2] : 0 } };
     }
@@ -395,12 +436,7 @@
 
       const scope = makeScope([]);
       const coords = splitTopLevel(inner);
-      const vals = coords.map((c) => {
-        const fn = compileAst(parse(c), []); // 点的坐标只能是常量表达式
-        const v = fn(scope);
-        if (!Number.isFinite(v)) throw new Error('点的坐标算不出有限值:' + c);
-        return v;
-      });
+      const vals = coords.map((c) => evalConst(c, '点的坐标'));
       if (vals.length < 2) throw new Error('点至少需要两个坐标:' + m[0] + inner + ')');
       if (vals.length > 3) throw new Error('点最多只能有三个坐标:' + m[0] + inner + ')');
       out.push({ x: vals[0], y: vals[1], z: vals.length > 2 ? vals[2] : 0, label });
@@ -2006,6 +2042,9 @@
     parsePoints: parsePoints,
     parseCallArgs: parseCallArgs,
     parseCoordRef: parseCoordRef,
+    evalConst: evalConst,
+    fmtNum: fmtNum,
+    sphereEquation: sphereEquation,
     regionCells: regionCells,
     projectMeshQuads: projectMeshQuads,
     buildQuads: buildQuads,

@@ -206,6 +206,7 @@ hexo.extend.filter.register('after_post_render', function (data) {
     const items = [];        // 曲线 / 方程 / 点,各自带自己的约束
     const globalConds = [];  // 独立成行、不带 where 的约束 = 全图生效
     const shapes = [];       // 线段 / 多边形(先把引用存下来,整块扫完再解析)
+    const spheres = [];      // 球面:球心引用也要等点都读完才能解析
 
     // segment(A, B) / line(A, B) / polygon(A, B, C) / face(...) / triangle(...)
     const SHAPE_RE = /^(segment|line|polygon|face|triangle)\s*\(/i;
@@ -269,6 +270,42 @@ hexo.extend.filter.register('after_post_render', function (data) {
           shapes.push({ kind: isSegment ? 'segment' : 'polygon', refs, conds, source: line.trim() });
         } catch (e) {
           problems.push(`${data.source}:"${line}" —— ${e.message}`);
+        }
+      } else if (/^sphere\s*\(/i.test(base)) {
+        // 球面:sphere(球心, 半径) 或 sphere(x, y, z, r)
+        if (kind !== '3d') {
+          problems.push(`${data.source}:"${line}" —— 球面是 3D 的;plot2d 里请写成 x^2 + y^2 = r^2 这种方程`);
+        } else {
+          try {
+            const call = Kit.parseCallArgs(base, 'sphere');
+            if (!call) throw new Error('没找到 sphere(...)');
+            const args = call.args;
+            let center = null;
+            let centerRef = null;
+            let centerText = null;
+            let radius;
+            let radiusRaw;
+            if (args.length === 4) {
+              center = {
+                x: Kit.evalConst(args[0]), y: Kit.evalConst(args[1]), z: Kit.evalConst(args[2]),
+              };
+              centerText = `(${args[0]}, ${args[1]}, ${args[2]})`;
+              radius = Kit.evalConst(args[3], '半径');
+              radiusRaw = args[3];
+            } else if (args.length === 2) {
+              const ref = Kit.parseCoordRef(args[0]);
+              if (ref.coords) center = ref.coords; else centerRef = ref.label;
+              centerText = args[0];
+              radius = Kit.evalConst(args[1], '半径');
+              radiusRaw = args[1];
+            } else {
+              throw new Error(`sphere 要么写 4 个数 sphere(x, y, z, r),`
+                + `要么写 2 个 sphere(球心, r),现在给了 ${args.length} 个`);
+            }
+            spheres.push({ center, centerRef, centerText, radius, radiusRaw, conds, source: line.trim() });
+          } catch (e) {
+            problems.push(`${data.source}:"${line}" —— ${e.message}`);
+          }
         }
       } else if (!conds.length && /<=|>=|<|>/.test(base)) {
         // 独立成行、不带 where 的约束:全图生效
@@ -347,6 +384,25 @@ hexo.extend.filter.register('after_post_render', function (data) {
       }
     });
 
+    // 球面:展开成等值面方程,归到普通的 implicit 条目里。
+    // 放在这里(而不是扫描时立刻展开)是因为球心可以引用点的标签。
+    spheres.forEach((sp) => {
+      try {
+        const c = sp.center || resolve({ label: sp.centerRef });
+        const expr = Kit.sphereEquation(c, sp.radius);
+        items.push({
+          type: 'implicit',
+          expr,
+          // 标签里写人话,而不是展开后那一长串方程。
+          // 球心和半径都直接用作者写的原文 —— `r = sqrt(3)/2` 比 `r = 0.866025403784` 好读太多。
+          display: `球 · 球心 ${sp.centerText} · r = ${sp.radiusRaw}`,
+          constraints: sp.conds,
+        });
+      } catch (e) {
+        problems.push(`${data.source}:"${sp.source}" —— ${e.message}`);
+      }
+    });
+
     // 全局约束并进每一条:语义是"先按整张图的限制裁,再按各自 where 裁"
     items.forEach((it) => { it.constraints = globalConds.concat(it.constraints); });
 
@@ -383,11 +439,13 @@ hexo.extend.filter.register('after_post_render', function (data) {
         problems.push(`${data.source}:一个 plot3d 代码块里没有可画的式子`);
         return whole;
       }
-      // 一个图里可以叠多个曲面/等值面(比如正四面体堆积的四个相切球),
-      // 上限 8 个纯粹是防手滑:再多就该拆成几张图了。
-      const surfaces = curves.slice(0, 8);
-      if (curves.length > 8) {
-        problems.push(`${data.source}:3D 最多叠 8 个曲面,超出的被忽略了`);
+      // 一个图里可以叠多个曲面/等值面(比如正四面体堆积的四个相切球、
+      // 六方最密堆积晶胞的 17 个球),上限纯粹是防手滑:再多就该拆成几张图了。
+      // 32 够放下一个晶胞(六方 17 球 / 面心立方 14 球)还留了余量。
+      const MAX_SURFACES = 32;
+      const surfaces = curves.slice(0, MAX_SURFACES);
+      if (curves.length > MAX_SURFACES) {
+        problems.push(`${data.source}:3D 最多叠 ${MAX_SURFACES} 个曲面,超出的被忽略了`);
       }
       // 隐式方程(f(x,y,z)=0)和显式曲面(z=...)的默认范围、网格数、归一化方式都不同,
       // 混在同一个代码块里会互相打架,所以拆开判断并给个提醒。
@@ -431,8 +489,9 @@ hexo.extend.filter.register('after_post_render', function (data) {
       o2.alpha = alpha;
 
       payload = { items: surfaces.concat(polygons, segments, points), opts: o2 };
+      const nameOf = (it) => it.display || it.expr;
       label = surfaces.length === 1
-        ? (anyImplicit ? `3D 等值面 · ${surfaces[0].expr}` : `3D 曲面 · z = ${surfaces[0].expr}`)
+        ? (anyImplicit ? `3D 等值面 · ${nameOf(surfaces[0])}` : `3D 曲面 · z = ${nameOf(surfaces[0])}`)
         : surfaces.length
           ? `3D · ${surfaces.length} 个曲面`
           : '3D · 线段与面';

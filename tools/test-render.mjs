@@ -272,8 +272,35 @@ console.log('\n=== 3D 显式曲面 ===');
   ok('曲面四边形被填充', record.fills.length > 100, `${record.fills.length} 个`);
 }
 
-console.log('\n=== 3D 多曲面(正四面体堆积的四个相切球:用户笔记里的场景) ===');
+console.log('\n=== 晶胞规模的球堆积(17 个球的六方最密堆积) ===');
 {
+  // 就是演示文章里那一块。这里只喂 17 条 implicit,验证渲染器不虚。
+  const s = Math.sqrt(8 / 3);
+  const hex = [[2, 0], [1, Math.sqrt(3)], [-1, Math.sqrt(3)], [-2, 0], [-1, -Math.sqrt(3)], [1, -Math.sqrt(3)], [0, 0]];
+  const mid = [[1, Math.sqrt(3) / 3], [-1, Math.sqrt(3) / 3], [0, -2 * Math.sqrt(3) / 3]];
+  const centers = [];
+  hex.forEach(([x, y]) => centers.push({ x, y, z: -s }));
+  mid.forEach(([x, y]) => centers.push({ x, y, z: 0 }));
+  hex.forEach(([x, y]) => centers.push({ x, y, z: s }));
+
+  const items = centers.map((c) => ({
+    type: 'implicit',
+    expr: `(x-${c.x})^2+(y-${c.y})^2+(z-${c.z})^2=1`,
+    constraints: [],
+  }));
+  ok('确实是 17 个球', items.length === 17, String(items.length));
+
+  const { record, el } = render('3d', {
+    items,
+    opts: { x: [-3.05, 3.05], y: [-3.05, 3.05], z: [-2.7, 2.7], grid: 24, alpha: 0.45 },
+  });
+  ok('17 个球没有抛错也没有被截断', !el.dataset.error, errText(record));
+  ok('面数合理(五千上下)', record.fills.length > 3000 && record.fills.length < 9000, `${record.fills.length} 个面`);
+  const colors = new Set(record.shapes.filter((x) => x.kind === 'fill').map((x) => x.style));
+  ok('17 个球用了多种颜色', colors.size >= 4, `${colors.size} 种`);
+}
+
+console.log('\n=== 3D 多曲面(正四面体堆积的四个相切球:用户笔记里的场景) ===');{
   const { record, el } = render('3d', {
     items: [
       { type: 'implicit', expr: '(x-1)^2+y^2+z^2=3/4', constraints: [] },

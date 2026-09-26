@@ -468,6 +468,63 @@ console.log('\n=== 网格密度上下限(渲染器与插件共用一份) ===');
   ok('显式曲面默认网格是 46', def.n === 46, String(def.n));
 }
 
+console.log('\n=== sphere(球心, 半径) ===');
+{
+  const eq = Kit.sphereEquation({ x: 1, y: 0, z: 0 }, 0.75);
+  ok('展开成隐式方程', eq === '(x-1)^2+y^2+z^2=0.5625', eq);
+  ok('展开后的方程能编译', typeof Kit.compileImplicit(eq, ['x', 'y', 'z']) === 'function');
+
+  const neg = Kit.sphereEquation({ x: -1, y: -0.5, z: 2 }, 2);
+  ok('负球心写成 + 号', neg === '(x+1)^2+(y+0.5)^2+(z-2)^2=4', neg);
+
+  // 展开出来的球面必须和手写方程算出一模一样的东西
+  const box = { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 32 };
+  const auto = Kit.surfaceNets(Kit.compileImplicit(Kit.sphereEquation({ x: 1, y: 0, z: 0 }, 0.75), ['x', 'y', 'z']), box);
+  const hand = Kit.surfaceNets(Kit.compileImplicit('(x-1)^2+y^2+z^2=0.5625', ['x', 'y', 'z']), box);
+  ok('和手写方程结果完全一致',
+    auto.quads.length === hand.quads.length && auto.verts.length === hand.verts.length,
+    `${auto.quads.length} vs ${hand.quads.length}`);
+  ok('球面上的点到球心距离都≈半径', (() => {
+    // 渲染空间是归一化过的(x←数学 x,y←数学 z,z←数学 y,half=2),
+    // 所以还原回数学坐标要乘 2,再按 x/z/y 的顺序取。
+    const bad = auto.verts.filter((v) => {
+      const d = Math.hypot(2 * v.x - 1, 2 * v.z, 2 * v.y);
+      return Math.abs(d - 0.75) > 0.06;
+    });
+    return bad.length / auto.verts.length < 0.05;
+  })());
+
+  // 浮点噪声要在打印前抹掉:sqrt(2)^2 在双精度里是 2.0000000000000004
+  ok('半径 sqrt(2) 时平方显示成整数 2',
+    Kit.sphereEquation({ x: 0, y: 0, z: 0 }, Math.SQRT2) === 'x^2+y^2+z^2=2',
+    Kit.sphereEquation({ x: 0, y: 0, z: 0 }, Math.SQRT2));
+  ok('fmtNum 抹掉浮点噪声', Kit.fmtNum(2.0000000000000004) === '2' && Kit.fmtNum(0.5625) === '0.5625');
+  ok('fmtNum 不动正常小数', Kit.fmtNum(Math.PI) === String(Number(Math.PI.toPrecision(12))));
+  ok('半径必须大于 0', (() => {
+    try { Kit.sphereEquation({ x: 0, y: 0, z: 0 }, 0); return false; } catch (e) { return /半径要大于 0/.test(e.message); }
+  })());
+  ok('负半径也报错', (() => {
+    try { Kit.sphereEquation({ x: 0, y: 0, z: 0 }, -1); return false; } catch { return true; }
+  })());
+
+  // 约束照常生效:上半球
+  const half = Kit.surfaceNets(
+    Kit.compileImplicit(Kit.sphereEquation({ x: 0, y: 0, z: 0 }, 1), ['x', 'y', 'z']),
+    { ...box, mask: Kit.makeMask([Kit.compileConstraint('z > 0', ['x', 'y', 'z'])]) },
+  );
+  const whole = Kit.surfaceNets(Kit.compileImplicit('x^2+y^2+z^2=1', ['x', 'y', 'z']), box);
+  ok('sphere 也能被 where 裁成半球',
+    half.verts.length > whole.verts.length * 0.3 && half.verts.length < whole.verts.length * 0.7,
+    `${half.verts.length} / ${whole.verts.length}`);
+  ok('半球上的点 z 都 > 0', half.verts.every((v) => v.y > -1e-9));
+
+  // evalConst 的错误信息要指明是什么算不出
+  ok('半径写成变量时给出明确报错', (() => {
+    try { Kit.evalConst('r', '半径'); return false; } catch (e) { return /^半径不对:/.test(e.message); }
+  })());
+  ok('球面里的半球 z 值判据用的是数学坐标', half.verts.every((v) => v.y > -1e-9));
+}
+
 console.log('\n=== 刻度与配色 ===');
 ok('niceStep 给出整齐的步长', [Kit.niceStep(10, 8), Kit.niceStep(1, 8), Kit.niceStep(1000, 5)]
   .every((v) => { const m = v / 10 ** Math.round(Math.log10(v)); return [1, 2, 5].some((k) => near(m, k) || near(m * 10, k)); }));
