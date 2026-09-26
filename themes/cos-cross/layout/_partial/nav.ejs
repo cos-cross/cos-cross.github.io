@@ -10,7 +10,7 @@
       </span>
       <span class="brand-text">
         <strong><%= siteName %></strong>
-        <em><%= theme.profile.bio %></em>
+        <% if (theme.profile.bio) { %><em><%= theme.profile.bio %></em><% } %>
       </span>
     </a>
 

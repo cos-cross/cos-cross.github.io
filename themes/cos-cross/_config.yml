@@ -20,7 +20,7 @@ profile:
   avatar: '/img/avatar.jpg'
   favicon: '/img/favicon-32.png'
   appleTouchIcon: '/img/apple-touch-icon.png'
-  bio: 高中生 · 编程 / 数学 / 音游
+  bio: 编程 / 数学 / 音游            # 头像下面那行小字;留空则整行不显示
   level: "LV.99"                   # 头像右下角那个小角标,留空则不显示
 
 # 首页大屏(hero)
@@ -32,7 +32,7 @@ hero:
   # title:
   # subtitle:
   # desc 留空则用站点 _config.yml 的 description
-  desc: "把灵感写成代码,把热爱打成 PERFECT。"
+  desc: "Present Day, Present Time"
   tags:
     - JavaScript
     - Python

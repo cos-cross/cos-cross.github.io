@@ -77,6 +77,16 @@ function activate(context) {
   log('');
 
   if (context && context.subscriptions && vscode) {
+    // 右下角状态栏放一个小图标:一眼就能看出扩展到底激活了没有。
+    // "预览里没画出图"有一半的可能压根不是渲染问题,而是扩展没被加载 ——
+    // 但预览里的表现完全一样,所以给一个不依赖翻日志的判据。
+    const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 60);
+    status.text = '$(graph) plot';
+    status.tooltip = `函数图像预览已激活(v${require('./package.json').version})· 点这里看诊断`;
+    status.command = 'plot-preview.diagnose';
+    status.show();
+    context.subscriptions.push(status);
+
     context.subscriptions.push(vscode.commands.registerCommand('plot-preview.diagnose', () => {
       ensureChannel();
       log('');
@@ -91,7 +101,9 @@ function activate(context) {
         log('   1. 装完扩展没有重载窗口(VSCode 要重建 markdown-it 实例);');
         log('   2. 扩展被禁用了 / VSCode 版本低于 engines.vscode 要求;');
         log('   3. 打开的是「Markdown Preview Enhanced」之类自带预览的扩展,');
-        log('      它们不走 VSCode 的 extendMarkdownIt。');
+        log('      它们不走 VSCode 的 extendMarkdownIt;');
+        log('   4. 用的其实是别的编辑器(Cursor / VSCodium / Trae 之类),');
+        log('      扩展目录和自带预览的实现都不一样。');
       } else if (!fencesSeen) {
         log('');
         log('❌ 钩子装上了,但一次都没收到 plot 围栏。');

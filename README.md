@@ -1075,7 +1075,7 @@ GITHUB_TOKEN=ghp_xxx npm run deploy
 | --- | --- |
 | 浏览器标签页 | `_config.yml` → `title` / `subtitle` |
 | 导航栏品牌名 | `_config.yml` → `title`(或主题配置 `profile.name` 覆盖) |
-| 导航栏头像下面的小字 | 主题配置 → `profile.bio` |
+| 导航栏头像下面的小字 | 主题配置 → `profile.bio`(**留空则整行不显示**) |
 | 导航菜单项(首页/文章/项目/关于) | 主题配置 → `menu` |
 | 头像右下角小角标(`LV.99`) | 主题配置 → `profile.level`(留空则不显示) |
 | 大屏徽章(`PLAYER 1 · READY`) | 主题配置 → `hero.greeting` + `hero.status` |
@@ -1142,7 +1142,7 @@ profile:
 hero:
   # title:                # 注释着 → 用 _config.yml 的 title
   # subtitle:             # 注释着 → 用 _config.yml 的 subtitle
-  desc: "把灵感写成代码,把热爱打成 PERFECT。"   # 留空则用 _config.yml 的 description
+  desc: "Present Day, Present Time"   # 留空则用 _config.yml 的 description
 ```
 
 只有当你**想让某个位置显示得和站点标题不一样**时才需要打开它们。比如站名是「Cos-CrossのBlogger」,但导航栏嫌太长想只显示「Cos-Cross」,就打开 `profile.name` 填短的:
