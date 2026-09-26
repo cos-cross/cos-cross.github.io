@@ -1132,6 +1132,31 @@ GITHUB_TOKEN=ghp_xxx npm run deploy
 | 页脚「已经坚持了 N 天」 | 主题配置 → `text.footer_days` |
 | 页脚三列标题(导航/找到我/订阅) | 主题配置 → `text.footer_col_nav` / `footer_col_find` / `footer_col_sub` |
 | 页脚右下角彩蛋 `ALL PERFECT` | 主题配置 → `text.footer_combo`(留空则整块隐藏) |
+| 页脚「找到我」和手机菜单底部的社交链接 | 主题配置 → `social`(渲染成 shields.io 徽章,见下) |
+
+#### 社交链接是 shields.io 徽章
+
+页脚「找到我」和手机端菜单底部显示的不是纯文字,而是 shields.io 的 **flat-square 静态徽章**
+(标签 + 右边那句 + 品牌色 + 图标),编 URL 的逻辑在 `tools/social-badge.cjs`,单测在 `tools/test-theme.mjs`:
+
+```yaml
+social:
+  - name: GitHub            # 徽章左边的标签
+    icon: github            # 图标;Simple Icons 里没有的(mail / link)自动不带图标
+    link: https://github.com/cos-cross
+    badge: cos-cross        # 徽章右边的文字;留空则从 link 里推(github.com/cos-cross)
+    badge_color: '181717'   # 右边那块底色,带不带 # 都行;写错会退回中性灰
+    # badge_label_color: 0d1017   # 左边那块,默认就是主题面板那个深色
+    # badge_logo: none            # 想单独控制图标时用这个
+```
+
+**为什么单测是必要的**:徽章路径要遵守 shields.io 的转义规则(`-`→`--`、`_`→`__`、空格→`_`)。
+写错了页面照样出图,只是文字被截断(`cos-cross` 变成 `cos`),肉眼很难发现。
+
+**代价**:徽章是**访问者浏览器里**去 `img.shields.io` 现取的静态 SVG,不是构建期下载进来的。
+好处是改 `badge:` / `badge_color:` 不用重新构建也不会构建失败;代价是**墙内 / 断网时可能加载不出来**
+(那时页面就只剩三个空链接)。想彻底不依赖外网,就把这几个 SVG 下到 `source/img/badges/`
+再改成相对路径 —— 模板只认 `social_badge_url()` 返回的字符串,换成自己的 URL 一样能用。
 
 三个好用的点:
 

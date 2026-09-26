@@ -32,9 +32,7 @@
         <ul>
           <% (theme.social || []).forEach(function (item) { %>
           <li>
-            <a href="<%= item.link %>" target="_blank" rel="noopener noreferrer">
-              <%- partial('_partial/icon', { name: item.icon, size: 14 }) %><%= item.name %>
-            </a>
+            <%- partial('_partial/social-badge', { item: item }) %>
           </li>
           <% }); %>
         </ul>

@@ -84,16 +84,31 @@ home:
   show_tags: true
 
 # 社交链接(icon 可选:github / bilibili / mail / link)
+# 页脚「找到我」和手机端菜单底部显示的是 shields.io 徽章,不是纯文字链接,
+# 字段含义:
+#   name               徽章左边的标签
+#   badge              徽章右边的文字(留空则从 link 里推,比如 github.com/cos-cross)
+#   badge_color        右边那块的底色,十六进制,带不带 # 都行
+#   badge_label_color  左边那块的底色,默认是主题面板那个深色,一般不用写
+#   badge_logo         Simple Icons 的图标名;填 none 就不要图标
+# 徽章是浏览器里现取的静态 SVG,所以改这些字段不需要重新构建也不会构建失败 ——
+# 但它在墙内 / 断网时可能加载不出来,详见 README「社交徽章」那节。
 social:
   - name: GitHub
     icon: github
     link: https://github.com/cos-cross
+    badge: cos-cross
+    badge_color: '181717'
   - name: Bilibili
     icon: bilibili
     link: https://space.bilibili.com/388480733
+    badge: '@Cos_Cross'
+    badge_color: FB7299
   - name: 邮箱
     icon: mail
     link: mailto:coscross@126.com
+    badge: coscross@126.com
+    badge_color: '1f6feb'
 
 # 文章页
 post:
