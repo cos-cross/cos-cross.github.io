@@ -6,6 +6,9 @@
 #  【调整顺序】数组顺序就是显示顺序,首页只取前几个
 #  【添加】复制一段改字段,或者用命令自动生成骨架:
 #           npm run projects -- add <仓库名>
+#  【自动】新仓库不用手动加 —— `npm run deploy` 会先跑一次
+#           `npm run projects -- sync`,把还没收录的公开仓库自动补进来
+#           (个人资料仓库 `<用户名>/<用户名>`、fork、以及 AUTO_SYNC_SKIP 里的会跳过)
 #
 #  改完记得 `npm run check` 自检、`npm run deploy` 发布。
 #
@@ -96,3 +99,13 @@
   icon: link
   accent: cyan
   group: 小玩意
+
+- name: vscode-plot-preview
+  desc: 一个 VS Code 扩展,在自带的 Markdown 预览里直接渲染函数图像 —— 写笔记时边写边看图,和博客用的是同一个渲染核心。
+  lang: VS Code
+  link: ''
+  repo: https://github.com/cos-cross/vscode-plot-preview
+  tags: [扩展, 可视化, 工具链]
+  icon: star
+  accent: lime
+  group: 在线工具

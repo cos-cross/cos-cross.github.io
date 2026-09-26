@@ -299,15 +299,25 @@ npm run avatar -- "D:\pictures\me.png"
 
 ### 添加
 
-两种方式,任选:
+**新仓库会自动进来。** `npm run deploy` 的第一步就是
 
 ```bash
-# ① 自动拉取仓库信息,生成骨架(推荐)
-npm run projects -- add GuessLetter
+npm run projects -- sync     # 把还没收录的公开仓库自动补进 projects.yml
+```
+
+它会用**公开**接口列出你的仓库,把不在清单里的补成骨架(仓库名、描述、语言、Pages 地址都从
+GitHub 那边填好),然后 `deploy` 会连同清单一起提交 —— 所以新仓库不用手动加。
+
+自动跳过的三类:个人资料仓库(`<用户名>/<用户名>`)、fork、以及
+`tools/manage-projects.mjs` 里 `AUTO_SYNC_SKIP` 名单里的。想手动控制,还有两条路:
+
+```bash
+npm run projects -- sync --dry           # 只看看会补哪些,不写文件
+npm run projects -- add GuessLetter      # 只加某一个
 ```
 
 ```yaml
-# ② 手动复制一段改字段
+# 或者直接手动复制一段改字段
 - name: 新项目
   desc: 一句话介绍
   lang: JavaScript
@@ -318,6 +328,9 @@ npm run projects -- add GuessLetter
   accent: cyan                               # cyan / violet / pink / lime / gold
   group: 在线工具                             # /projects/ 页面按它分组
 ```
+
+省事的骨架自动生成,但**描述和标签值得手动润色** —— 自动抓来的是 GitHub 上那句描述,
+经常是空的或者没写清楚。不想展示某一条就在它里面加 `hidden: true`。
 
 **数组顺序就是展示顺序。** 首页只显示前几个,数量在 `themes/cos-cross/_config.yml` 的 `home.projects` 里改。
 

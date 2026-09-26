@@ -140,9 +140,14 @@ async function check() {
     }
   }
 
-  const missing = repos
-    .filter((r) => !listed.has(r.name) && !r.fork)
-    .map((r) => r.name);
+  // 还没收录的:fork / 个人资料仓库 / AUTO_SYNC_SKIP 里的不算 ——
+  // `sync` 会故意跳过它们,这里再报"想加就跑 add"只会让人困惑。
+  const skipReason = (r) => (r.fork ? 'fork' : null)
+    || (r.name === user ? '个人资料仓库' : null)
+    || (AUTO_SYNC_SKIP.has(r.name) ? '在 AUTO_SYNC_SKIP 里' : null);
+  const missing = repos.filter((r) => !listed.has(r.name) && !skipReason(r)).map((r) => r.name);
+  const skipped = repos.filter((r) => !listed.has(r.name) && skipReason(r))
+    .map((r) => `${r.name}(${skipReason(r)})`);
 
   const visible = entries.filter((e) => !e.hidden).length;
 
@@ -161,8 +166,13 @@ async function check() {
     console.log('');
   }
   if (missing.length) {
-    console.log(`还没收录的公开仓库(${missing.length} 个,想加就跑 npm run projects -- add <名字>):`);
+    console.log(`还没收录的公开仓库(${missing.length} 个,跑 npm run projects -- sync 会自动补):`);
     console.log(`   ${missing.join('、')}`);
+    console.log('');
+  }
+  if (skipped.length) {
+    console.log(`自动收录会跳过的(${skipped.length} 个):`);
+    console.log(`   ${skipped.join('、')}`);
     console.log('');
   }
 
@@ -212,10 +222,25 @@ async function add(name) {
   }
 
   const repo = await res.json();
+
+  const entry = skeleton(repo);
+
+  const text = readFileSync(projectsFile, 'utf8');
+  writeFileSync(projectsFile, `${text.replace(/\s*$/, '')}\n\n${entry}\n`, 'utf8');
+
+  console.log(`已添加 ${repo.name} 到 source/_data/projects.yml:\n`);
+  console.log(entry);
+  console.log('\n记得补一下 desc / tags / group / accent,然后 npm run check && npm run deploy。');
+  return 0;
+}
+
+/* ---------- 生成清单骨架 ---------- */
+
+/** 仓库 → 一条清单骨架(字段尽量从 GitHub 那边填好,desc/tags 建议再润色) */
+function skeleton(repo) {
   const link = repo.homepage || (repo.has_pages ? pagesUrl(repo.name) : '');
   const desc = (repo.description || '待补充一句话介绍').replace(/'/g, "''");
-
-  const entry = [
+  return [
     `- name: ${repo.name}`,
     `  desc: ${desc}`,
     `  lang: ${repo.language || 'Code'}`,
@@ -226,13 +251,63 @@ async function add(name) {
     '  accent: cyan',
     '  group: 项目',
   ].join('\n');
+}
+
+/* ---------- sync:自动收录新仓库 ---------- */
+
+/**
+ * 自动收录时跳过的仓库。
+ * 个人资料仓库(`<用户名>/<用户名>`)和 fork 已经在代码里直接跳了,这里放"其它不想自动加"的。
+ */
+const AUTO_SYNC_SKIP = new Set([
+  '10chen01.github.io',
+]);
+
+/**
+ * 把所有还没收录的公开仓库补进清单。
+ *
+ * 为什么要有它:新建仓库之后很容易忘了往 projects.yml 里加一条,项目页就一直是旧的。
+ * 现在 `npm run deploy` 会先跑一次这个(带 --soft,连不上 GitHub 就跳过),
+ * 于是新仓库会自动出现在项目页上,作者只需要事后润色一下描述。
+ *
+ * 三条安全线:私有仓库根本不会出现在公开接口里;个人资料仓库和 fork 直接跳过;
+ * AUTO_SYNC_SKIP 里的也不动。想临时不展示某一条,给它加 `hidden: true` 即可。
+ */
+async function sync(dry, soft) {
+  let repos;
+  try {
+    repos = await publicRepos();
+  } catch (e) {
+    if (soft) {
+      console.warn(`⚠️  连不上 GitHub,跳过自动收录(${e.message})`);
+      return 0;
+    }
+    throw e;
+  }
+
+  const entries = existsSync(projectsFile) ? parseProjects(readFileSync(projectsFile, 'utf8')) : [];
+  const listed = new Set(entries.map((e) => e.repoName || e.name));
+  const todo = repos.filter((r) => !listed.has(r.name) && !r.fork
+    && r.name !== user && !AUTO_SYNC_SKIP.has(r.name));
+
+  if (!todo.length) {
+    console.log('项目清单:公开仓库都在里面了,没有要补的。');
+    return 0;
+  }
+
+  console.log(`项目清单:发现 ${todo.length} 个还没收录的公开仓库`);
+  for (const r of todo) {
+    console.log(`   + ${r.name}${r.description ? ` —— ${r.description}` : ''}`);
+  }
+  if (dry) {
+    console.log('\n(--dry:只看看,没有写文件)');
+    return 0;
+  }
 
   const text = readFileSync(projectsFile, 'utf8');
-  writeFileSync(projectsFile, `${text.replace(/\s*$/, '')}\n\n${entry}\n`, 'utf8');
-
-  console.log(`已添加 ${repo.name} 到 source/_data/projects.yml:\n`);
-  console.log(entry);
-  console.log('\n记得补一下 desc / tags / group / accent,然后 npm run check && npm run deploy。');
+  writeFileSync(projectsFile, `${text.replace(/\s*$/, '')}\n\n${todo.map(skeleton).join('\n\n')}\n`, 'utf8');
+  console.log(`\n已自动补进 source/_data/projects.yml。`);
+  console.log('建议手动润色一下 desc / tags / group / accent —— 不想展示就加一行 hidden: true。');
   return 0;
 }
 
@@ -250,8 +325,12 @@ try {
     code = await list();
   } else if (command === 'add') {
     code = await add(args.filter((a) => !a.startsWith('--'))[1]);
+  } else if (command === 'sync') {
+    code = await sync(args.includes('--dry'), args.includes('--soft'));
   } else {
     console.log('可用命令:');
+    console.log('  npm run projects -- sync             把还没收录的公开仓库自动补进清单');
+    console.log('  npm run projects -- sync --dry       只看看会补哪些,不写文件');
     console.log('  npm run projects -- check            校验清单');
     console.log('  npm run projects -- list             列出公开仓库及收录状态');
     console.log('  npm run projects -- add <仓库名>      从 GitHub 生成一条清单骨架');
