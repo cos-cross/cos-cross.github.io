@@ -54,9 +54,13 @@ const counts = {
   explicit: all.filter((i) => i.type === 'explicit').length,
   implicit: all.filter((i) => i.type === 'implicit').length,
   point: all.filter((i) => i.type === 'point').length,
+  segment: all.filter((i) => i.type === 'segment').length,
+  polygon: all.filter((i) => i.type === 'polygon').length,
 };
-console.log(`       条目:显式曲线 ${counts.explicit},隐式方程 ${counts.implicit},点 ${counts.point}`);
+console.log(`       条目:显式曲线 ${counts.explicit},隐式方程 ${counts.implicit},点 ${counts.point},`
+  + ` 线段 ${counts.segment},多边形 ${counts.polygon}`);
 check('三类条目都有', counts.explicit > 0 && counts.implicit > 0 && counts.point > 0);
+check('线段与多边形也有实例', counts.segment > 0 && counts.polygon > 0);
 
 function maskOf(item) {
   const is3d = !item.__p.items.some((i) => i.type === 'explicit')
@@ -80,6 +84,22 @@ for (const item of all) {
       // 点是"要么保留要么被排除",两种都算正常,只要能算出来
       if (Number.isFinite(item.x) && Number.isFinite(item.y) && typeof kept === 'boolean') okItems += 1;
       else failures.push(`点 (${item.x},${item.y})`);
+      continue;
+    }
+
+    if (item.type === 'segment') {
+      const finite = [item.a, item.b].every((v) => v && Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z));
+      const len = Math.hypot(item.b.x - item.a.x, item.b.y - item.a.y, item.b.z - item.a.z);
+      if (finite && len > 1e-9) okItems += 1;
+      else failures.push(`线段 ${JSON.stringify(item.a)}→${JSON.stringify(item.b)} 长度 ${len}`);
+      continue;
+    }
+
+    if (item.type === 'polygon') {
+      const finite = Array.isArray(item.points) && item.points.length >= 3
+        && item.points.every((v) => Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z));
+      if (finite) okItems += 1;
+      else failures.push(`多边形顶点数 ${item.points && item.points.length}`);
       continue;
     }
 

@@ -344,6 +344,35 @@ ok('四个以上坐标会报错', (() => {
   try { Kit.parsePoints('point(1, 2, 3, 4)', []); return false; } catch { return true; }
 })());
 
+console.log('\n=== 线段与多边形的顶点引用 ===');
+{
+  const call = Kit.parseCallArgs('segment(A, B)', 'segment');
+  ok('拆出两个参数', call && call.args.length === 2, JSON.stringify(call && call.args));
+  ok('segment 之外的词不会被误认', Kit.parseCallArgs('polygon(A, B, C)', 'segment') === null);
+  ok('字母数字混排的关键词不会误命中', Kit.parseCallArgs('mysegment(A, B)', 'segment') === null);
+  ok('多边形的顶级逗号切分', Kit.parseCallArgs('polygon(A, B, C, D)', 'polygon').args.length === 4);
+
+  const byLabel = Kit.parseCoordRef('A1');
+  ok('裸标识符当成标签引用', byLabel.label === 'A1' && !byLabel.coords);
+  const lit = Kit.parseCoordRef('(1, 2, 3)');
+  ok('括号里的坐标在构建期就算好',
+    lit.coords.x === 1 && lit.coords.y === 2 && Math.abs(lit.coords.z - 3) < 1e-12);
+  const lit2 = Kit.parseCoordRef('(sqrt(3)/2, -1/2)');
+  ok('坐标里能用函数和负号',
+    Math.abs(lit2.coords.x - Math.sqrt(3) / 2) < 1e-12 && lit2.coords.y === -0.5);
+  ok('两坐标时 z 默认 0', lit2.coords.z === 0);
+  ok('坐标里的逗号不影响解析', Kit.parseCoordRef('(min(1,2), max(3,4))').coords.y === 4);
+  ok('既不是标签也不是坐标时报错', (() => {
+    try { Kit.parseCoordRef('1, 2'); return false; } catch (e) { return /不认识的顶点/.test(e.message); }
+  })());
+  ok('坐标数量不对时报错', (() => {
+    try { Kit.parseCoordRef('(1)'); return false; } catch { return true; }
+  })());
+  ok('括号没闭合时报错', (() => {
+    try { Kit.parseCallArgs('segment(A, B', 'segment'); return false; } catch { return true; }
+  })());
+}
+
 console.log('\n=== where:按曲线定制约束 ===');
 ok('没有 where 时原样返回', Kit.splitWhere('sin(x)').conds.length === 0);
 ok('拆出单个条件', (() => {

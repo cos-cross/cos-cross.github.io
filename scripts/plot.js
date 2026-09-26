@@ -205,6 +205,10 @@ hexo.extend.filter.register('after_post_render', function (data) {
     // 然后是比较(<=/>= 里也含 "=",必须排在等号前面),最后才是等号和显式函数。
     const items = [];        // 曲线 / 方程 / 点,各自带自己的约束
     const globalConds = [];  // 独立成行、不带 where 的约束 = 全图生效
+    const shapes = [];       // 线段 / 多边形(先把引用存下来,整块扫完再解析)
+
+    // segment(A, B) / line(A, B) / polygon(A, B, C) / face(...) / triangle(...)
+    const SHAPE_RE = /^(segment|line|polygon|face|triangle)\s*\(/i;
 
     /**
      * `y = f(x)` / `z = f(x,y)` 这种"左边只有一个因变量"的等式,按显式函数处理。
@@ -246,6 +250,26 @@ hexo.extend.filter.register('after_post_render', function (data) {
         } catch (e) {
           problems.push(`${data.source}:"${line}" —— ${e.message}`);
         }
+      } else if (SHAPE_RE.test(base)) {
+        // 线段 / 多边形。顶点可以引用同一块里定义的点(靠标签),
+        // 也可以直接写坐标。这里先原样存下引用,等整块扫完再解析 ——
+        // 否则 `segment(A, B)` 写在 `point(...) A` 前面就会找不到 A。
+        const keyword = /^([A-Za-z_]\w*)/.exec(base)[1].toLowerCase();
+        const isSegment = keyword === 'segment' || keyword === 'line';
+        try {
+          const call = Kit.parseCallArgs(base, keyword);
+          if (!call) throw new Error(`没找到 ${keyword}(...)`);
+          const refs = call.args.map((a) => Kit.parseCoordRef(a));
+          if (isSegment && refs.length !== 2) {
+            throw new Error(`线段要正好两个端点,现在写了 ${refs.length} 个`);
+          }
+          if (!isSegment && refs.length < 3) {
+            throw new Error(`多边形至少要三个顶点,现在写了 ${refs.length} 个`);
+          }
+          shapes.push({ kind: isSegment ? 'segment' : 'polygon', refs, conds, source: line.trim() });
+        } catch (e) {
+          problems.push(`${data.source}:"${line}" —— ${e.message}`);
+        }
       } else if (!conds.length && /<=|>=|<|>/.test(base)) {
         // 独立成行、不带 where 的约束:全图生效
         try {
@@ -284,17 +308,65 @@ hexo.extend.filter.register('after_post_render', function (data) {
       }
     });
 
+    // 先把点按标签建成表,再解析线段/多边形的引用 ——
+    // 这样"先写图形后写点"也能正常工作。
+    const byLabel = new Map();
+    items.forEach((it) => {
+      if (it.type !== 'point' || !it.label) return;
+      if (byLabel.has(it.label)) {
+        problems.push(`${data.source}:点的标签「${it.label}」重复定义了,引用它时用最先出现的那个`);
+        return;
+      }
+      byLabel.set(it.label, it);
+    });
+
+    const resolve = (ref) => {
+      if (ref.coords) return ref.coords;
+      const p = byLabel.get(ref.label);
+      if (!p) {
+        const known = [...byLabel.keys()].join('、') || '(这个块里没有带标签的点)';
+        throw new Error(`找不到名为「${ref.label}」的点;已定义的标签:${known}`);
+      }
+      return { x: p.x, y: p.y, z: p.z };
+    };
+
+    shapes.forEach((sh) => {
+      try {
+        const pts = sh.refs.map(resolve);
+        if (sh.kind === 'segment') {
+          const [a, b] = pts;
+          if (Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) < 1e-12) {
+            throw new Error('线段两个端点重合了');
+          }
+          items.push({ type: 'segment', a, b, constraints: sh.conds });
+        } else {
+          items.push({ type: 'polygon', points: pts, constraints: sh.conds });
+        }
+      } catch (e) {
+        problems.push(`${data.source}:"${sh.source}" —— ${e.message}`);
+      }
+    });
+
     // 全局约束并进每一条:语义是"先按整张图的限制裁,再按各自 where 裁"
     items.forEach((it) => { it.constraints = globalConds.concat(it.constraints); });
 
-    const curves = items.filter((it) => it.type !== 'point');
+    const notShape = (it) => it.type === 'explicit' || it.type === 'implicit';
+    const curves = items.filter(notShape);
     const points = items.filter((it) => it.type === 'point');
+    const segments = items.filter((it) => it.type === 'segment');
+    const polygons = items.filter((it) => it.type === 'polygon');
+    const hasShape = segments.length > 0 || polygons.length > 0;
 
-    // 整块只有独立的点(既没有曲线,也不是区域模式)时,纵轴按点自动定范围。
+    // 整块只有独立的点/线段/多边形(既没有曲线,也不是区域模式)时,纵轴自动定范围。
     // 区域模式下不能这么做 —— 否则画布会被几个点挤成一条窄带,区域就看不出来了。
-    if (kind === '2d' && points.length && !curves.length && !globalConds.length) {
-      const ys = points.map((p) => p.y);
-      if (!Array.isArray(o.y)) {
+    if (kind === '2d' && (points.length || hasShape) && !curves.length && !globalConds.length
+      && !Array.isArray(o.y)) {
+      const ys = [
+        ...points.map((p) => p.y),
+        ...segments.flatMap((s) => [s.a.y, s.b.y]),
+        ...polygons.flatMap((p) => p.points.map((v) => v.y)),
+      ];
+      if (ys.length) {
         const lo = Math.min(...ys);
         const hi = Math.max(...ys);
         const pad = Math.max((hi - lo) * 0.2, 0.5);
@@ -307,7 +379,7 @@ hexo.extend.filter.register('after_post_render', function (data) {
     let ratio = null;
 
     if (kind === '3d') {
-      if (!curves.length && !points.length) {
+      if (!curves.length && !points.length && !hasShape) {
         problems.push(`${data.source}:一个 plot3d 代码块里没有可画的式子`);
         return whole;
       }
@@ -343,21 +415,29 @@ hexo.extend.filter.register('after_post_render', function (data) {
       // 叠四个球看起来还是一个球。单个曲面保持不透明(实心的更好看)。
       const asked = Number.isFinite(o.alpha) ? o.alpha : o.opacity;
       let alpha = Number.isFinite(asked) ? Math.max(0.05, Math.min(1, asked)) : 1;
-      if (!Number.isFinite(asked) && surfaces.length > 1) alpha = 0.62;
+      // 默认半透明的前提是"有东西会互相遮挡":多个曲面,或者曲面/面片加起来不止一块
+      const fillCount = surfaces.length + polygons.length;
+      if (!Number.isFinite(asked) && fillCount > 1) alpha = 0.62;
       o2.alpha = alpha;
 
-      payload = { items: surfaces.concat(points), opts: o2 };
+      payload = { items: surfaces.concat(polygons, segments, points), opts: o2 };
       label = surfaces.length === 1
         ? (anyImplicit ? `3D 等值面 · ${surfaces[0].expr}` : `3D 曲面 · z = ${surfaces[0].expr}`)
-        : `3D · ${surfaces.length} 个曲面`;
+        : surfaces.length
+          ? `3D · ${surfaces.length} 个曲面`
+          : '3D · 线段与面';
       if (alpha < 1) label += ` · 半透明 ${Math.round(alpha * 100)}%`;
       const globalCount = globalConds.length;
       if (globalCount) label += ` · ${globalCount} 个全局约束`;
       if (surfaces.some((it) => it.constraints.length > globalCount)) label += ' · 带 where';
+      if (polygons.length) label += ` · ${polygons.length} 个面`;
+      if (segments.length) label += ` · ${segments.length} 条线段`;
       if (points.length) label += ` · ${points.length} 个点`;
     } else {
-      const regionOnly = !curves.length && globalConds.length > 0;
-      if (!curves.length && !globalConds.length && !points.length) {
+      const hasCurves = curves.length > 0;
+      // 有线段/面片时就不是"只写约束画区域"了,别再顺手把区域填上
+      const regionOnly = !hasCurves && !hasShape && globalConds.length > 0;
+      if (!hasCurves && !globalConds.length && !points.length && !hasShape) {
         problems.push(`${data.source}:一个 plot2d 代码块里没有可画的式子`);
         return whole;
       }
@@ -378,7 +458,7 @@ hexo.extend.filter.register('after_post_render', function (data) {
       if (hasImplicit || regionOnly) ratio = 1;
 
       payload = {
-        items: kept.concat(points),
+        items: kept.concat(polygons, segments, points),
         region: regionOnly ? globalConds : [],
         opts: { x: xr, y: yr, samples: Math.max(100, Math.min(2000, o.n || 900)) },
       };
@@ -391,6 +471,8 @@ hexo.extend.filter.register('after_post_render', function (data) {
       if (globalConds.length && !regionOnly) parts.push(`${globalConds.length} 个全局约束`);
       const withWhere = kept.filter((it) => it.constraints.length > globalConds.length).length;
       if (withWhere) parts.push(`${withWhere} 条带 where`);
+      if (polygons.length) parts.push(`${polygons.length} 个面`);
+      if (segments.length) parts.push(`${segments.length} 条线段`);
       if (points.length) parts.push(`${points.length} 个点`);
       label = `2D · ${parts.join(' + ')}`;
     }

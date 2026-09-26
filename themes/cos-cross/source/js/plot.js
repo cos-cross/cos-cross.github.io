@@ -341,6 +341,44 @@
     return out.map((v) => v.trim()).filter((v) => v !== '');
   }
 
+  /**
+   * 取出 text 里第一个 `name(...)` 调用,返回括号内按顶层逗号切开的参数。
+   * `segment(A, B)` / `polygon(A, B, C)` 这类写法都靠它。
+   */
+  function parseCallArgs(text, name) {
+    const re = new RegExp('(?:^|[^A-Za-z0-9_])' + name + '\\s*\\(', 'i');
+    const m = re.exec(text);
+    if (!m) return null;
+    const open = m.index + m[0].length - 1;
+    const close = matchParen(text, open);
+    if (close < 0) throw new Error(name + ' 的括号没有闭合:' + text.trim());
+    return { args: splitTopLevel(text.slice(open + 1, close)) };
+  }
+
+  /**
+   * 线段/多边形的顶点有两种写法:
+   *   A           —— 引用同一块里 `point(...) A` 定义的标签
+   *   (1, 2, 3)   —— 直接写常量坐标
+   * 光写 `1, 2` 是不行的:分不清那到底是标签还是坐标,索性要求坐标必须带括号。
+   */
+  function parseCoordRef(arg) {
+    const s = String(arg).trim();
+    const ev = (c) => {
+      const v = compileAst(parse(c), [])(makeScope([]));
+      if (!Number.isFinite(v)) throw new Error('坐标算不出有限值:' + c);
+      return v;
+    };
+    if (s.startsWith('(') && s.endsWith(')')) {
+      const vals = splitTopLevel(s.slice(1, -1)).map(ev);
+      if (vals.length < 2 || vals.length > 3) throw new Error('坐标要写两个或三个:' + s);
+      return { coords: { x: vals[0], y: vals[1], z: vals.length > 2 ? vals[2] : 0 } };
+    }
+    if (!/^[A-Za-z_]\w*$/.test(s)) {
+      throw new Error(`不认识的顶点「${s}」:要么引用点的标签(如 A),要么直接写坐标(如 (1, 2, 0))`);
+    }
+    return { label: s };
+  }
+
   function parsePoints(src, allowedVars) {
     const out = [];
     const text = String(src);
@@ -1050,6 +1088,24 @@
       });
     }
 
+    // 1.5) 多边形面片垫在曲线下面(几何图里"先铺面、再画线")
+    (state.polygons || []).forEach(function (face, fi) {
+      var color = state.colors[fi % state.colors.length];
+      ctx.beginPath();
+      face.points.forEach(function (p, i) {
+        var px = x2p(p.x), py = y2p(p.y);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      });
+      ctx.closePath();
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = color;
+      ctx.stroke();
+    });
+
     // 每条曲线按自己的约束算好了,依次画(颜色按顺序分配)
     (state.renderedSeries || []).forEach(function (item, si) {
       var color = state.colors[si % state.colors.length];
@@ -1081,6 +1137,28 @@
           ctx.lineTo(x2p(b.x), y2p(b.y));
         }
       }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    });
+
+    // 2.5) 线段盖在曲线之上(它是"作图辅助线",不该被函数线压住)
+    var segScope2d = makeScope(['x', 'y']);
+    (state.segments || []).forEach(function (seg) {
+      // 约束按中点判定:整条留或整条不留。
+      // 想只要一半就把它拆成两条,或者用 where 分开写。
+      if (seg.mask) {
+        segScope2d.x = (seg.a.x + seg.b.x) / 2;
+        segScope2d.y = (seg.a.y + seg.b.y) / 2;
+        if (!seg.mask(segScope2d)) return;
+      }
+      ctx.beginPath();
+      ctx.moveTo(x2p(seg.a.x), y2p(seg.a.y));
+      ctx.lineTo(x2p(seg.b.x), y2p(seg.b.y));
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#ffd166';
+      ctx.shadowColor = '#ffd166';
+      ctx.shadowBlur = 8;
+      ctx.lineCap = 'round';
       ctx.stroke();
       ctx.shadowBlur = 0;
     });
@@ -1133,6 +1211,11 @@
     });
   }
 
+  /** 线段按比例取点(渲染空间坐标就是普通的三维向量) */
+  function lerpPoint(a, b, t) {
+    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
+  }
+
   function render3D(ctx, canvas, state, theme) {
     var w = canvas.width / theme.dpr;
     var h = canvas.height / theme.dpr;
@@ -1161,6 +1244,75 @@
     });
     for (var qi = 0; qi < items.length; qi++) items[qi].kind = 'quad';
 
+    // 面片:顶点投影后按平均深度参与排序,和曲面共享同一套画家算法。
+    // 颜色编号接在曲面后面,这样一个图里"每个填充块一个颜色"。
+    var surfaceCount = (state.surfaces || []).length;
+    (state.polygons || []).forEach(function (face, fi) {
+      var pts = [];
+      var depth = 0;
+      var ok = true;
+      for (var k = 0; k < face.pts.length; k++) {
+        var sp = project(face.pts[k], state.cam, w, h);
+        if (sp.depth <= 0.05) { ok = false; break; }
+        sp.x += state.panX || 0;
+        sp.y += state.panY || 0;
+        pts.push(sp);
+        depth += sp.depth;
+      }
+      if (!ok) return;
+      depth /= pts.length;
+
+      // 平面法线用渲染空间的三点叉积求,再和光照方向点乘 ——
+      // 取绝对值是因为面片是双面的(从背面看也得有明暗,而不是全黑)。
+      var e1 = { x: face.pts[1].x - face.pts[0].x, y: face.pts[1].y - face.pts[0].y, z: face.pts[1].z - face.pts[0].z };
+      var e2 = { x: face.pts[2].x - face.pts[0].x, y: face.pts[2].y - face.pts[0].y, z: face.pts[2].z - face.pts[0].z };
+      var nx = e1.y * e2.z - e1.z * e2.y;
+      var ny = e1.z * e2.x - e1.x * e2.z;
+      var nz = e1.x * e2.y - e1.y * e2.x;
+      var len = Math.hypot(nx, ny, nz) || 1;
+      var nCam = rotatePoint({ x: nx / len, y: ny / len, z: nz / len }, state.cam);
+      var light = Math.abs(nCam.x * LIGHT_DIR[0] + nCam.y * LIGHT_DIR[1] + nCam.z * LIGHT_DIR[2]);
+
+      items.push({
+        kind: 'face',
+        pts: pts,
+        depth: depth,
+        light: Math.max(0.35, 0.35 + 0.65 * light),
+        surface: surfaceCount + fi,
+      });
+    });
+
+    // 线段:按深度**切成小段**再分别排序。
+    // 整条线只按中点排序的话,一条从球前面穿到球后面的棱会整根被球挡住或者
+    // 整根盖在球上面,两种都明显不对。切开之后遮挡关系就是逐段正确的。
+    var SEG_PIECES = 14;
+    var segScope = makeScope(['x', 'y', 'z']);
+    (state.segments || []).forEach(function (seg) {
+      for (var k = 0; k < SEG_PIECES; k++) {
+        var t0 = k / SEG_PIECES, t1 = (k + 1) / SEG_PIECES;
+        var p0 = lerpPoint(seg.a, seg.b, t0);
+        var p1 = lerpPoint(seg.a, seg.b, t1);
+        var s0 = project(p0, state.cam, w, h);
+        var s1 = project(p1, state.cam, w, h);
+        if (s0.depth <= 0.05 || s1.depth <= 0.05) continue;
+        // 约束按每一小段的中点判定 —— 于是 `segment(A,B) where z > 0`
+        // 能真的只留上半截,而不是整条去掉。
+        if (seg.mask) {
+          var mid = lerpPoint(seg.a, seg.b, (t0 + t1) / 2);
+          segScope.x = mid.x; segScope.y = mid.y; segScope.z = mid.z;
+          if (!seg.mask(segScope)) continue;
+        }
+        items.push({
+          kind: 'seg',
+          depth: (s0.depth + s1.depth) / 2,
+          x0: s0.x + (state.panX || 0),
+          y0: s0.y + (state.panY || 0),
+          x1: s1.x + (state.panX || 0),
+          y1: s1.y + (state.panY || 0),
+        });
+      }
+    });
+
     // 把点也塞进同一个深度序列 —— 这样球背面的点会被球正确地挡住
     (state.points || []).forEach(function (p) {
       var sp = project({ x: p.nx, y: p.ny, z: p.nz }, state.cam, w, h);
@@ -1178,7 +1330,8 @@
     items.sort(function (a, b) { return b.depth - a.depth; });
 
     var quads = items;
-    var multiSurface = (state.surfaces || []).length > 1;
+    // 填充块(曲面 + 面片)不止一个时按序号轮流换色,一眼能区分是哪一块
+    var multiFill = (state.surfaces || []).length + (state.polygons || []).length > 1;
 
     for (var i = 0; i < quads.length; i++) {
       var q = quads[i];
@@ -1203,9 +1356,52 @@
         }
         continue;
       }
-      // 多个曲面时按曲面编号上色(更容易分辨是哪一块);
-      // 只有一个曲面时保持原来的高度渐变色。
-      var rgb = (multiSurface
+
+      if (q.kind === 'seg') {
+        // 线段始终不透明、带一点辉光 —— 它读起来是"作图辅助线",
+        // 跟着曲面一起变半透明的话会和面糊在一起看不清。
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.moveTo(q.x0, q.y0);
+        ctx.lineTo(q.x1, q.y1);
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#ffd166';
+        ctx.shadowColor = '#ffd166';
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        continue;
+      }
+
+      if (q.kind === 'face') {
+        // 多边形面片:平面法线定明暗,再乘上全局透明度
+        var frgb = hexToRgb(COLORS[q.surface % COLORS.length]);
+        var fm = q.light;
+        if (translucent) fm = 0.55 + 0.45 * fm;
+        var fcol = 'rgba('
+          + Math.min(255, Math.round(frgb[0] * fm)) + ','
+          + Math.min(255, Math.round(frgb[1] * fm)) + ','
+          + Math.min(255, Math.round(frgb[2] * fm)) + ','
+          + alpha + ')';
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.moveTo(q.pts[0].x, q.pts[0].y);
+        for (var fi = 1; fi < q.pts.length; fi++) ctx.lineTo(q.pts[fi].x, q.pts[fi].y);
+        ctx.closePath();
+        ctx.fillStyle = fcol;
+        ctx.fill();
+        // 面片描边:实体几何图里棱线很重要,顺手描一圈同色边
+        ctx.strokeStyle = fcol;
+        ctx.lineWidth = 1.4;
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+        continue;
+      }
+
+      // 多个填充块时按编号上色(更容易分辨是哪一块);
+      // 只有一个的时候保持原来的高度渐变色。
+      var rgb = (multiFill
         ? hexToRgb(COLORS[q.surface % COLORS.length])
         : colormap(q.t).match(/\d+/g));
       var m = q.light;
@@ -1371,7 +1567,9 @@
 
       if (kind === '3d') {
         // 一个图里可以有多个曲面/等值面,各自带自己的约束
-        const surfaceItems = compiled.filter(function (it) { return it.type !== 'point'; });
+        const surfaceItems = compiled.filter(function (it) {
+          return it.type === 'explicit' || it.type === 'implicit';
+        });
         state.surfaces = surfaceItems.map(function (it) {
           const o = Object.assign({}, payload.opts, { mask: it.mask });
           if (it.type === 'implicit') {
@@ -1413,19 +1611,41 @@
         const hy = hasMesh ? half : ((by - ay) / 2 || 1);
         const hz = hasMesh ? half : ((zr[1] - zr[0]) / 2 || 1);
         const scope = makeScope(['x', 'y', 'z']);
+        // 数学坐标 → 渲染立方体。点、线段、面片都用同一套比例,
+        // 免得三者对不上(尤其是非正方体包围盒)。
+        const toRender = function (p) {
+          return { x: (p.x - cx) / hx, y: (p.z - cz) / hz, z: (p.y - cy) / hy };
+        };
         state.points = compiled.filter(function (it) {
           if (it.type !== 'point') return false;
           if (!it.mask) return true;
           scope.x = it.x; scope.y = it.y; scope.z = it.z;
           return it.mask(scope);
         }).map(function (p) {
-          return {
-            nx: (p.x - cx) / hx,
-            ny: (p.z - cz) / hz,
-            nz: (p.y - cy) / hy,
-            label: p.label,
-          };
+          const r = toRender(p);
+          return { nx: r.x, ny: r.y, nz: r.z, label: p.label };
         });
+
+        // 线段:保留原端点,渲染时再按深度切开(见 render3D)—— 一整条线只按
+        // 中点排序的话,穿过球的那一段遮挡关系会明显不对。
+        state.segments = compiled.filter(function (it) { return it.type === 'segment'; })
+          .map(function (s) {
+            return { a: toRender(s.a), b: toRender(s.b), mask: s.mask };
+          });
+
+        // 面片:顶点投影后按平均深度参与排序。约束按重心判定(整块留或整块不留)。
+        state.polygons = compiled.filter(function (it) { return it.type === 'polygon'; })
+          .filter(function (pg) {
+            if (!pg.mask) return true;
+            let sx = 0, sy = 0, sz = 0;
+            pg.points.forEach(function (p) { sx += p.x; sy += p.y; sz += p.z; });
+            const n = pg.points.length;
+            scope.x = sx / n; scope.y = sy / n; scope.z = sz / n;
+            return pg.mask(scope);
+          })
+          .map(function (pg) {
+            return { pts: pg.points.map(toRender) };
+          });
       } else {
         // 区域模式:整块只有约束条件
         state.regionMask = (payload.region && payload.region.length)
@@ -1438,11 +1658,24 @@
         const scope = makeScope(['x', 'y']);
         const curves = [];
         const dots = [];
+        const segs = [];
+        const faces = [];
         compiled.forEach(function (it) {
           if (it.type === 'point') {
             if (!it.mask) { dots.push(it); return; }
             scope.x = it.x; scope.y = it.y;
             if (it.mask(scope)) dots.push(it);
+          } else if (it.type === 'segment') {
+            segs.push({ a: it.a, b: it.b, mask: it.mask });
+          } else if (it.type === 'polygon') {
+            if (it.mask) {
+              let sx = 0, sy = 0;
+              it.points.forEach(function (p) { sx += p.x; sy += p.y; });
+              const n = it.points.length;
+              scope.x = sx / n; scope.y = sy / n;
+              if (!it.mask(scope)) return;
+            }
+            faces.push({ points: it.points });
           } else if (it.type === 'implicit') {
             curves.push({ kind: 'implicit', fn: compileImplicit(it.expr, varNames), mask: it.mask });
           } else {
@@ -1451,6 +1684,8 @@
         });
         state.curves = curves;
         state.points = dots;
+        state.segments = segs;
+        state.polygons = faces;
         state.colors = COLORS;
         state.opts = payload.opts;
         state.renderedSeries = [];
@@ -1744,6 +1979,8 @@
     makeMask: makeMask,
     splitWhere: splitWhere,
     parsePoints: parsePoints,
+    parseCallArgs: parseCallArgs,
+    parseCoordRef: parseCoordRef,
     regionCells: regionCells,
     projectMeshQuads: projectMeshQuads,
     buildQuads: buildQuads,

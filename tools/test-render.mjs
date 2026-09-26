@@ -7,6 +7,7 @@
  * 记录所有 canvas 调用,于是渲染问题也能在 Node 里发现。
  */
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -384,6 +385,87 @@ console.log('\n=== 3D 隐式曲面 + 约束 + 点 ===');
   ok('点的标签画出来了', record.texts.some((t) => t[0] === 'Z'));
 }
 
+console.log('\n=== 3D 线段与多边形面 ===');
+{
+  const items = [
+    { type: 'point', x: 1, y: 1, z: 1, label: 'A', constraints: [] },
+    { type: 'point', x: 1, y: -1, z: -1, label: 'B', constraints: [] },
+    { type: 'point', x: -1, y: 1, z: -1, label: 'C', constraints: [] },
+    { type: 'point', x: -1, y: -1, z: 1, label: 'D', constraints: [] },
+    { type: 'segment', a: { x: 1, y: 1, z: 1 }, b: { x: 1, y: -1, z: -1 }, constraints: [] },
+    { type: 'segment', a: { x: 1, y: 1, z: 1 }, b: { x: -1, y: 1, z: -1 }, constraints: [] },
+    { type: 'polygon', points: [{ x: 1, y: 1, z: 1 }, { x: 1, y: -1, z: -1 }, { x: -1, y: 1, z: -1 }], constraints: [] },
+  ];
+  const opts = { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 20, alpha: 0.6 };
+  const { record, el } = render('3d', { items, opts });
+  ok('没有报错', !el.dataset.error, errText(record));
+
+  // 线段被切成小段后分别参与深度排序
+  const segs = record.shapes.filter((s) => s.kind === 'stroke' && s.style === '#ffd166' && s.path.length === 2);
+  ok('线段被画出来了(而且按深度切成了很多小段)', segs.length >= 20, `${segs.length} 段`);
+  ok('线段保持不透明', record.globalAlpha === 1);
+
+  // 多边形:3 个点的闭合路径,填充 + 描边
+  const faces = record.shapes.filter((s) => s.kind === 'fill' && s.path.length === 3);
+  ok('多边形面填出来了', faces.length === 1, `${faces.length} 个`);
+  ok('面片用了自己的颜色(不是灰度)',
+    faces.length === 1 && /^rgba\(\d+,\d+,\d+,0\.6\)$/.test(faces[0].style), faces.length ? faces[0].style : '');
+  const faceStroke = record.shapes.filter((s) => s.kind === 'stroke' && s.path.length === 3);
+  ok('面片描了一圈边', faceStroke.length === 1);
+
+  // 点依然画在最上层并且不透明
+  ok('点还是画出来的', record.arcs.length >= 4);
+  ok('标签都在', ['A', 'B', 'C', 'D'].every((L) => record.texts.some((t) => t[0] === L)));
+
+  // 只有线段和面的图:没有曲面,不透明;而且不能被当成"没有可画的东西"
+  const plain = render('3d', { items: items.slice(4), opts: { x: [-2, 2], y: [-2, 2], z: [-2, 2], alpha: 1 } });
+  ok('纯线段/面的图也能画', !plain.el.dataset.error, errText(plain.record));
+  ok('面片按不透明度填充',
+    plain.record.shapes.filter((s) => s.kind === 'fill' && s.path.length === 3)
+      .every((s) => s.style.endsWith(',1)')));
+}
+
+console.log('\n=== 3D 线段的约束:按小段的中点裁 ===');
+{
+  // 一条从下到上穿过原点的线段,只要 z > 0 的那半截
+  const { record, el } = render('3d', {
+    items: [{
+      type: 'segment',
+      a: { x: 0, y: 0, z: -1 },
+      b: { x: 0, y: 0, z: 1 },
+      constraints: ['z > 0'],
+    }],
+    opts: { x: [-2, 2], y: [-2, 2], z: [-2, 2], alpha: 1 },
+  });
+  ok('没有报错', !el.dataset.error, errText(record));
+  const segs = record.shapes.filter((s) => s.kind === 'stroke' && s.path.length === 2);
+  ok('上半截留下了', segs.length > 0, `${segs.length} 段`);
+  // 14 段里大约一半该被裁掉(严格的 z > 0,正好在 z=0 的那一段会被去掉)
+  ok('下半截被裁掉(剩不到 3/4)', segs.length <= 11, `${segs.length} 段`);
+}
+
+console.log('\n=== 2D 线段与多边形 ===');
+{
+  const { record, el } = render('2d', {
+    items: [
+      { type: 'point', x: 0, y: 0, label: 'O', constraints: [] },
+      { type: 'point', x: 2, y: 0, label: 'A', constraints: [] },
+      { type: 'point', x: 0, y: 2, label: 'B', constraints: [] },
+      { type: 'polygon', points: [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 0, y: 2 }], constraints: [] },
+      { type: 'segment', a: { x: 0, y: 0 }, b: { x: 2, y: 2 }, constraints: [] },
+    ],
+    region: [],
+    opts: { x: [-1, 3], y: [-1, 3], samples: 200 },
+  });
+  ok('没有报错', !el.dataset.error, errText(record));
+  const faces = record.shapes.filter((s) => s.kind === 'fill' && s.path.length === 3);
+  ok('2D 多边形填出来了', faces.length === 1, `${faces.length} 个`);
+  ok('2D 面片是半透明的', faces.length === 1 && faces[0].alpha === 0.22, faces.length ? String(faces[0].alpha) : '');
+  const segs = record.shapes.filter((s) => s.kind === 'stroke' && s.style === '#ffd166' && s.path.length === 2);
+  ok('2D 线段画出来了(2D 不切段)', segs.length === 1, `${segs.length} 条`);
+  ok('点在最上层', record.arcs.length >= 3);
+}
+
 console.log('\n=== 出错时的表现 ===');
 {
   const { el } = render('2d', {
@@ -391,6 +473,47 @@ console.log('\n=== 出错时的表现 ===');
     region: [], opts: { x: [-1, 1], y: [-1, 1], samples: 100 },
   });
   ok('表达式错误会显示提示而不是静默白屏', el.dataset.error === '1', String(el.dataset.error));
+}
+
+console.log('\n=== 构建产物里的真实载荷(端到端) ===');
+{
+  // 前面那些用例的载荷是我手写的,只能证明"渲染器没问题";
+  // 这一段直接从 public/ 里把**构建期插件真正写出来的**载荷抠出来跑一遍,
+  // 于是"语法 → 载荷 → 画面"整条链路都算验证过了。
+  const pages = [
+    'public/posts/function-plot/index.html',
+    'public/posts/由化学知识点想到的数学题/index.html',
+  ].map((p) => path.join(root, p)).filter((p) => fs.existsSync(p));
+
+  if (!pages.length) {
+    console.log('SKIP  还没构建过(先跑 hexo generate)');
+  } else {
+    let total = 0;
+    let exploded = 0;
+    let empty = 0;
+    const kinds = new Set();
+    for (const page of pages) {
+      const html = fs.readFileSync(page, 'utf8');
+      const re = /<div class="plot" data-kind="(\w+)"[^>]*>[\s\S]*?<script type="application\/json">([\s\S]*?)<\/script>/g;
+      for (const m of html.matchAll(re)) {
+        const kind = m[1];
+        let payload;
+        try { payload = JSON.parse(m[2].replace(/\\u003c/g, '<')); } catch { exploded += 1; continue; }
+        total += 1;
+        (payload.items || []).forEach((it) => kinds.add(it.type));
+        const r = render(kind, payload);
+        if (r.el.dataset.error) { exploded += 1; console.log(`       ✗ ${errText(r.record)}`); continue; }
+        const drawn = r.record.shapes.length + r.record.texts.length;
+        if (drawn === 0) empty += 1;
+      }
+    }
+    ok('构建产物里的每个载荷都能画出来', exploded === 0, `${total} 个载荷,${exploded} 个出错`);
+    ok('没有"能解析但一个图元都没画"的载荷', empty === 0, `${empty} 个空图`);
+    ok('载荷覆盖了全部五种图元',
+      ['explicit', 'implicit', 'point', 'segment', 'polygon'].every((t) => kinds.has(t)),
+      [...kinds].join(','));
+    console.log(`       跑了 ${total} 张图,图元类型:${[...kinds].join(' / ')}`);
+  }
 }
 
 console.log(`\n${pass} 通过,${fail} 失败`);
