@@ -434,6 +434,11 @@ hexo.extend.filter.register('after_post_render', function (data) {
     let label;
     let ratio = null;
 
+    // 画布高宽比。默认 3D 是 0.78、2D 是 0.58;
+    // 作者写了 ratio= 就用他的(限制在 0.4~1.4,不然布局会很难看)。
+    const askedRatio = Number.isFinite(o.ratio) ? Math.max(0.4, Math.min(1.4, o.ratio)) : null;
+    if (askedRatio !== null) ratio = askedRatio;
+
     if (kind === '3d') {
       if (!curves.length && !points.length && !hasShape) {
         problems.push(`${data.source}:一个 plot3d 代码块里没有可画的式子`);
@@ -524,7 +529,9 @@ hexo.extend.filter.register('after_post_render', function (data) {
         const half = (xr[1] - xr[0]) / 2;
         yr = [cxr - half, cxr + half];
       }
-      if (hasImplicit || regionOnly) ratio = 1;
+      // 隐式曲线和区域(圆、椭圆…)必须横纵等比例,否则会被压扁。
+      // 作者显式写了 ratio= 的话就尊重他(他自己知道会变形)。
+      if ((hasImplicit || regionOnly) && askedRatio === null) ratio = 1;
 
       payload = {
         items: kept.concat(polygons, segments, points),

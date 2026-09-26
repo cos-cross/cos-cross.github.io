@@ -525,6 +525,81 @@ console.log('\n=== sphere(球心, 半径) ===');
   ok('球面里的半球 z 值判据用的是数学坐标', half.verts.every((v) => v.y > -1e-9));
 }
 
+console.log('\n=== 自动适配镜头(内容不会被画布切掉) ===');
+{
+  const CAM = { az: -0.62, el: 0.52, dist: 3.4, focal: 3.4 };
+  const W = 800;
+  const H = Math.round(W * 0.78);
+
+  // 一个球面的探针点(球在旋转下投影尺寸不变,正好用来验"最坏角度"那套逻辑)
+  const sphereProbes = [];
+  for (let i = 0; i <= 24; i++) {
+    for (let j = 0; j <= 12; j++) {
+      const th = (i / 24) * Math.PI * 2;
+      const ph = (j / 12) * Math.PI;
+      sphereProbes.push({
+        x: Math.sin(ph) * Math.cos(th), y: Math.cos(ph), z: Math.sin(ph) * Math.sin(th),
+      });
+    }
+  }
+
+  /** 在任意方位角/仰角下都装得下才算通过 */
+  const alwaysInside = (probes, zoom, pad) => {
+    for (const az of [0, 30, 60, 120, 200, 300]) {
+      for (const el of [-0.6, 0, 0.52, 1.0]) {
+        const cam = Object.assign({}, CAM, { az: CAM.az + az * Math.PI / 180, el, zoom });
+        for (const p of probes) {
+          const q = Kit.project(p, cam, W, H);
+          if (Math.abs(q.x - W / 2) > pad * W / 2 + 1e-6) return false;
+          if (Math.abs(q.y - H / 2) > pad * H / 2 + 1e-6) return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  const unit = [];
+  for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) unit.push({ x, y, z });
+
+  const z1 = Kit.fitZoom(unit, CAM, W, H);
+  ok('铺满画面的内容会被缩小到装得下', z1 < 1, String(z1));
+  // 这就是要修的 bug:默认 zoom=1 是按"小球在图中央"调的,铺满画面的图会被切掉
+  ok('默认 zoom=1 时确实装不下(这就是以前被切掉的原因)', !alwaysInside(unit, 1, 1));
+  ok('适配后转任意角度都不会被切掉', alwaysInside(sphereProbes, Kit.fitZoom(sphereProbes, CAM, W, H), 0.95));
+  ok('而且不会缩得太保守(至少占满一半画面)', (() => {
+    const z = Kit.fitZoom(sphereProbes, CAM, W, H);
+    const cam = Object.assign({}, CAM, { zoom: z });
+    const xs = sphereProbes.map((p) => Kit.project(p, cam, W, H).x);
+    return (Math.max(...xs) - Math.min(...xs)) > W * 0.5;
+  })());
+
+  const small = sphereProbes.map((p) => ({ x: p.x * 0.2, y: p.y * 0.2, z: p.z * 0.2 }));
+  const z2 = Kit.fitZoom(small, CAM, W, H);
+  ok('内容小的时候会自动放大', z2 > 1, String(z2));
+  ok('放大后同样转任何角度都装得下', alwaysInside(small, z2, 0.95));
+  ok('放大有上限(不会把坐标轴整个甩出画面)',
+    Kit.fitZoom([{ x: 0.001, y: 0, z: 0 }, { x: -0.001, y: 0, z: 0 }], CAM, W, H) <= 3);
+  ok('探针为空时安全返回 1', Kit.fitZoom([], CAM, W, H) === 1 && Kit.fitZoom(null, CAM, W, H) === 1);
+
+  // contentProbes:从各类图元里把点汇总出来,并会抽稀
+  const fakeState = {
+    surfaces: [{ kind: 'mesh', data: { verts: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0.5, z: 0 }] } }],
+    points: [{ nx: 0, ny: 0, nz: 0.9 }],
+    segments: [{ a: { x: -0.5, y: -0.5, z: 0 }, b: { x: 0.5, y: 0.5, z: 0 } }],
+    polygons: [{ pts: [{ x: 0, y: 0, z: -1 }, { x: 0.2, y: 0, z: 0 }, { x: 0, y: 0.2, z: 0 }] }],
+  };
+  const probes = Kit.contentProbes(fakeState);
+  ok('contentProbes 汇总了所有图元', probes.length === 2 + 1 + 2 + 3, `${probes.length} 个`);
+  ok('contentProbes 保留了极值', probes.some((p) => p.z === -1) && probes.some((p) => p.z === 0.9));
+  ok('contentProbes 会丢掉非有限值',
+    Kit.contentProbes({ surfaces: [{ kind: 'mesh', data: { verts: [{ x: NaN, y: 0, z: 0 }] } }] }).length === 0);
+  ok('点数超上限时会抽稀', (() => {
+    const many = { surfaces: [{ kind: 'mesh', data: { verts: Array.from({ length: 5000 }, (_, i) => ({ x: i / 5000, y: 0, z: 0 })) } }] };
+    const got = Kit.contentProbes(many, 1000);
+    return got.length === 1000 && got[got.length - 1].x > 0.99; // 抽稀后仍然覆盖到末尾
+  })());
+}
+
 console.log('\n=== 刻度与配色 ===');
 ok('niceStep 给出整齐的步长', [Kit.niceStep(10, 8), Kit.niceStep(1, 8), Kit.niceStep(1000, 5)]
   .every((v) => { const m = v / 10 ** Math.round(Math.log10(v)); return [1, 2, 5].some((k) => near(m, k) || near(m * 10, k)); }));

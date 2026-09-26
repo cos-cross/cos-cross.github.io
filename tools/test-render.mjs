@@ -262,6 +262,59 @@ console.log('\n=== 隐式曲线 + 区域背景 ===');
   ok('等值线段数量足够', record.moves.length > 100, `${record.moves.length} 段`);
 }
 
+console.log('\n=== 第一帧就完整可见(自动适配镜头) ===');
+{
+  // 用户的原话:「空间过小导致没显示完全」。六方最密堆积那 17 个球铺满整个包围盒,
+  // 默认视角下上下两条棱会掉到画布外 —— 这一段就是盯着这件事的回归测试。
+  const s = Math.sqrt(8 / 3);
+  const hex = [[2, 0], [1, Math.sqrt(3)], [-1, Math.sqrt(3)], [-2, 0], [-1, -Math.sqrt(3)], [1, -Math.sqrt(3)], [0, 0]];
+  const mid = [[1, Math.sqrt(3) / 3], [-1, Math.sqrt(3) / 3], [0, -2 * Math.sqrt(3) / 3]];
+  const items = [];
+  hex.forEach(([x, y]) => items.push({ type: 'implicit', expr: `(x-${x})^2+(y-${y})^2+(z+${s})^2=1`, constraints: [] }));
+  mid.forEach(([x, y]) => items.push({ type: 'implicit', expr: `(x-${x})^2+(y-${y})^2+z^2=1`, constraints: [] }));
+  hex.forEach(([x, y]) => items.push({ type: 'implicit', expr: `(x-${x})^2+(y-${y})^2+(z-${s})^2=1`, constraints: [] }));
+
+  const { record, el, canvas } = render('3d', {
+    items,
+    opts: { x: [-3.05, 3.05], y: [-3.05, 3.05], z: [-2.7, 2.7], grid: 16, alpha: 1 },
+  });
+  ok('没有报错', !el.dataset.error, errText(record));
+
+  // 桩 canvas 宽 800 → setupCanvas 按 3D 默认 0.78 得到高 624
+  const W = canvas.width;
+  const H = canvas.height;
+  const pts = [];
+  record.shapes.forEach((sh) => {
+    if (sh.kind !== 'fill') return;
+    sh.path.forEach((e) => {
+      if (e[0] === 'r') { pts.push([e[1], e[2]]); pts.push([e[1] + e[3], e[2] + e[4]]); } else pts.push([e[1], e[2]]);
+    });
+  });
+  const outX = Math.max(0, Math.max(...pts.map((p) => p[0])) - W, -Math.min(...pts.map((p) => p[0])));
+  const outY = Math.max(0, Math.max(...pts.map((p) => p[1])) - H, -Math.min(...pts.map((p) => p[1])));
+  ok('17 个球一个都没被画布切掉', outX <= 2 && outY <= 2,
+    `画布 ${W}×${H},溢出 x=${outX.toFixed(1)} y=${outY.toFixed(1)}`);
+
+  // 而且不能缩得太小 —— 内容的长边要占满"较短的那条边"的大部分。
+  // (画布比内容宽,所以横向占不满是正常的;真正卡住的是高度。)
+  const spanX = Math.max(...pts.map((p) => p[0])) - Math.min(...pts.map((p) => p[0]));
+  const spanY = Math.max(...pts.map((p) => p[1])) - Math.min(...pts.map((p) => p[1]));
+  const lim = Math.min(W, H);
+  ok('内容占满了画面的主要部分(不是缩成一小团)', Math.max(spanX, spanY) > lim * 0.7,
+    `${spanX.toFixed(0)}×${spanY.toFixed(0)},画布 ${W}×${H}`);
+
+  // 双击重置 / 工具条「重置」都要回到这个适配比例,而不是写死的 1
+  const resetBtn = render('3d', { items, opts: { x: [-3.05, 3.05], y: [-3.05, 3.05], z: [-2.7, 2.7], grid: 16, alpha: 1 } });
+  withDom(() => resetBtn.buttons.find((b) => b.dataset.plotAction === 'reset').click());
+  const pts2 = [];
+  resetBtn.record.shapes.forEach((sh) => {
+    if (sh.kind !== 'fill') return;
+    sh.path.forEach((e) => { if (e[0] !== 'r') pts2.push([e[1], e[2]]); });
+  });
+  const out2 = Math.max(0, Math.max(...pts2.map((p) => p[0])) - W, -Math.min(...pts2.map((p) => p[0])));
+  ok('点「重置」之后仍然完整可见', out2 <= 2, `溢出 x=${out2.toFixed(1)}`);
+}
+
 console.log('\n=== 3D 显式曲面 ===');
 {
   const { record, el } = render('3d', {
@@ -518,6 +571,8 @@ console.log('\n=== 构建产物里的真实载荷(端到端) ===');
     let total = 0;
     let exploded = 0;
     let empty = 0;
+    let clipped = 0;
+    const clippedNames = [];
     const kinds = new Set();
     for (const page of pages) {
       const html = fs.readFileSync(page, 'utf8');
@@ -532,6 +587,30 @@ console.log('\n=== 构建产物里的真实载荷(端到端) ===');
         if (r.el.dataset.error) { exploded += 1; console.log(`       ✗ ${errText(r.record)}`); continue; }
         const drawn = r.record.shapes.length + r.record.texts.length;
         if (drawn === 0) empty += 1;
+
+        // 3D:真实载荷也必须"打开就完整可见"。画布宽 800,高按 data-ratio 或 3D 默认 0.78。
+        if (kind === '3d') {
+          const W = r.canvas.width;
+          const H = r.canvas.height;
+          const xs = [];
+          const ys = [];
+          r.record.shapes.forEach((sh) => {
+            if (sh.kind !== 'fill') return;
+            sh.path.forEach((e) => {
+              if (e[0] === 'r') { xs.push(e[1], e[1] + e[3]); ys.push(e[2], e[2] + e[4]); }
+              else { xs.push(e[1]); ys.push(e[2]); }
+            });
+          });
+          if (xs.length) {
+            const over = Math.max(0,
+              Math.max(...xs) - W, -Math.min(...xs),
+              Math.max(...ys) - H, -Math.min(...ys));
+            if (over > 2) {
+              clipped += 1;
+              clippedNames.push(`x=[${payload.opts.x}] y=[${payload.opts.y}] 溢出 ${over.toFixed(0)}px`);
+            }
+          }
+        }
       }
     }
     ok('构建产物里的每个载荷都能画出来', exploded === 0, `${total} 个载荷,${exploded} 个出错`);
@@ -539,6 +618,8 @@ console.log('\n=== 构建产物里的真实载荷(端到端) ===');
     ok('载荷覆盖了全部五种图元',
       ['explicit', 'implicit', 'point', 'segment', 'polygon'].every((t) => kinds.has(t)),
       [...kinds].join(','));
+    ok('每张 3D 图打开时都完整可见(没有一个被画布切掉)', clipped === 0,
+      `${clipped} 张被切:${clippedNames.slice(0, 3).join('; ')}`);
     console.log(`       跑了 ${total} 张图,图元类型:${[...kinds].join(' / ')}`);
   }
 }
