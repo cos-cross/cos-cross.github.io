@@ -396,18 +396,28 @@ hexo.extend.filter.register('after_post_render', function (data) {
       if (anyImplicit && anyExplicit) {
         problems.push(`${data.source}:同一个 plot3d 里混了隐式方程和 z=... 曲面,建议拆成两个代码块`);
       }
+      // 网格密度的上下限和渲染器共用一份(Kit.GRID_LIMITS)—— 两边各写一套
+      // 就会出现"插件说最多 80、渲染器偷偷夹到 64",作者写了 80 却拿到 64 的图
+      // 还完全看不出来。这里如果真要夹,就直接报出来。
+      const gridKind = anyImplicit ? 'implicit' : 'explicit';
+      const gridLimit = Kit.GRID_LIMITS[gridKind];
+      const grid = Kit.clampGrid(o.grid, gridKind);
+      if (Number.isFinite(o.grid) && Math.round(o.grid) !== grid) {
+        problems.push(`${data.source}:grid=${o.grid} 超出${anyImplicit ? '隐式' : '显式'} 3D 允许的 `
+          + `${gridLimit.min}~${gridLimit.max},按 ${grid} 处理`);
+      }
       const o2 = anyImplicit
         ? {
           x: normalizeRange(o.x, [-2, 2]),
           y: normalizeRange(o.y, [-2, 2]),
           z: normalizeRange(o.z, [-2, 2]),
-          grid: Math.max(8, Math.min(80, o.grid || 32)),
+          grid,
         }
         : {
           x: normalizeRange(o.x, [-5, 5]),
           y: normalizeRange(o.y, [-5, 5]),
           z: Array.isArray(o.z) ? normalizeRange(o.z, [-1, 1]) : null,
-          grid: Math.max(8, Math.min(90, o.grid || 46)),
+          grid,
         };
 
       // 曲面透明度。作者写了 alpha= / opacity= 就用他的;

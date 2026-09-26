@@ -425,6 +425,49 @@ console.log('\n=== 半透明四边形(压接缝) ===');
       .every((p) => p.x === 3 && p.y === 3));
 }
 
+console.log('\n=== 网格密度上下限(渲染器与插件共用一份) ===');
+{
+  const L = Kit.GRID_LIMITS;
+  ok('隐式/显式各有一套上下限', !!L.implicit && !!L.explicit);
+  ok('没写 grid 时给默认值',
+    Kit.clampGrid(undefined, 'implicit') === L.implicit.def
+    && Kit.clampGrid(undefined, 'explicit') === L.explicit.def);
+  ok('超上限会被夹到上限', Kit.clampGrid(9999, 'implicit') === L.implicit.max);
+  ok('低于下限会被抬到下限', Kit.clampGrid(1, 'implicit') === L.implicit.min);
+  ok('小数会取整', Kit.clampGrid(48.6, 'explicit') === 49);
+  ok('区间内的值原样保留', Kit.clampGrid(64, 'implicit') === 64);
+
+  // 这条是回归测试:以前渲染器偷偷夹到 64,而插件说可以到 80,
+  // 于是 grid=80 画出来和 grid=64 一模一样,作者完全看不出来。
+  const fn = Kit.compileImplicit('x^2 + y^2 + z^2 = 1', ['x', 'y', 'z']);
+  const box = { x: [-2, 2], y: [-2, 2], z: [-2, 2] };
+  const atMax = Kit.surfaceNets(fn, { ...box, grid: L.implicit.max });
+  const over = Kit.surfaceNets(fn, { ...box, grid: L.implicit.max + 50 });
+  ok('超过上限时结果稳定等于上限的那一档', over.quads.length === atMax.quads.length,
+    `${over.quads.length} vs ${atMax.quads.length}`);
+  const finer = Kit.surfaceNets(fn, { ...box, grid: 64 });
+  ok('上限确实高于 64(grid=64 还不是天花板)', atMax.quads.length > finer.quads.length,
+    `${atMax.quads.length} > ${finer.quads.length}`);
+
+  // 网格越细,球面上四边形越多(单调),而且顶点半径仍然贴近 1
+  const counts = [16, 32, 64].map((g) => Kit.surfaceNets(fn, { ...box, grid: g }).quads.length);
+  ok('网格越细面越多', counts[0] < counts[1] && counts[1] < counts[2], counts.join(' < '));
+  const fine = Kit.surfaceNets(fn, { ...box, grid: 96 });
+  const err = Math.max(...fine.verts.map((v) => Math.abs(Math.hypot(v.x * 2, v.y * 2, v.z * 2) - 1)));
+  ok('再细形状也不会跑偏(半径仍≈1)', err < 0.03, `最大偏差 ${err.toFixed(4)}`);
+
+  // 范围收紧 = 免费的精细度:同样的 grid,盒子小一半,面数大约翻两番
+  const wide = Kit.surfaceNets(fn, { x: [-4, 4], y: [-4, 4], z: [-4, 4], grid: 32 }).quads.length;
+  const tight = Kit.surfaceNets(fn, { x: [-1.5, 1.5], y: [-1.5, 1.5], z: [-1.5, 1.5], grid: 32 }).quads.length;
+  ok('同样的 grid,盒子收紧后明显更细', tight > wide * 3, `${wide} → ${tight}`);
+
+  // 显式面的上限同样是共享的
+  const big = Kit.buildSurface('sin(x)*cos(y)', { x: [-5, 5], y: [-5, 5], grid: 9999 });
+  ok('显式曲面的上限也生效', big.n === L.explicit.max, String(big.n));
+  const def = Kit.buildSurface('sin(x)*cos(y)', { x: [-5, 5], y: [-5, 5] });
+  ok('显式曲面默认网格是 46', def.n === 46, String(def.n));
+}
+
 console.log('\n=== 刻度与配色 ===');
 ok('niceStep 给出整齐的步长', [Kit.niceStep(10, 8), Kit.niceStep(1, 8), Kit.niceStep(1000, 5)]
   .every((v) => { const m = v / 10 ** Math.round(Math.log10(v)); return [1, 2, 5].some((k) => near(m, k) || near(m * 10, k)); }));
