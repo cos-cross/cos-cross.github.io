@@ -940,19 +940,29 @@ $$
 
 ## 在 VSCode 里预览函数图像
 
-`vscode-plot-preview/` 是一个本地 VSCode 扩展:在**自带的 Markdown 预览**里直接渲染
-`plot2d` / `plot3d` 代码块,边写边看图。
+有个配套的 VSCode 扩展:**在自带的 Markdown 预览里直接渲染 `plot2d` / `plot3d`**,边写边看图。
+装一次之后**所有项目里的 `.md` 都能用**,不需要任何构建步骤。
 
-它**不重新实现**任何解析逻辑 —— 渲染核心(`preview/plot.js`)和"代码块 → 容器"的构建器
-(`vendor/plot-build.cjs`)都是从主题同步过来的,所以编辑器里看到的和网站上看到的一定一致。
+**它已经搬到独立仓库了,不在这个仓库里:**
 
-```bash
-npm run vscode:sync      # 从主题同步这三份文件
-npm run vscode:check     # 只检查是否一致(npm run check 里也会跑)
-npm run vscode:package   # 打成 plot-preview-1.0.0.vsix,能直接「从 VSIX 安装」
-```
+- 源码:https://github.com/cos-cross/vscode-plot-preview
+- 本地:`..\vscode-plot-preview`(和这个仓库平级)
 
-装法与实现细节见 `vscode-plot-preview/README.md`。忘了同步的话测试会红,不会悄悄跑偏。
+| 用途 | 命令 |
+| --- | --- |
+| 打包成 `.vsix` | `npm run package`(在那个仓库里跑) |
+| 改完本仓库的绘图代码后,把三份文件同步过去 | `npm run sync -- <本仓库路径>` |
+| 核对两边是否一致 | `node tools/test.mjs <本仓库路径>` |
+
+**分工**:绘图代码的**源头仍旧在这个仓库**(渲染核心 `themes/cos-cross/source/js/plot.js`、
+构建期插件 `scripts/plot.js`,以及它们的全部单测都在这里);扩展仓库只做"消费",
+把那两份 + 主题里的绘图样式同步过去并提交,于是它自己是自包含的。
+
+**这样做的理由**:画图的解析规则只能有一份。预览里看到的和网站上看到的必须完全一样,
+否则迟早出现"编辑器里好好的、网站上不对"这种最难查的问题。
+
+`.` 里留了 `vscode-plot-preview/` 这条 ignore 规则,纯粹是防线 —— 万一哪天有副本被丢回那个路径,
+不会误提交。
 
 ## 文件下载区:`files/` 文件夹
 
