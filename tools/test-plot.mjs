@@ -719,6 +719,67 @@ console.log('\n=== links(d):把相切的球心连起来 ===');
   ok('空数组安全', Kit.linkPairs([], 2).length === 0);
 }
 
+console.log('\n=== 禁止 eval 时的闭包求值器(VSCode 预览的 CSP) ===');
+{
+  ok('默认走编译版(new Function)', Kit.__nativeCompile() === true);
+
+  const cases = [
+    ['2+3*4', {}, 14],
+    ['2^3^2', {}, 512],
+    ['-2^2', {}, -4],
+    ['7 % 3', {}, 1],
+    ['1/0', {}, Infinity],
+    ['sqrt(16)', {}, 4],
+    ['max(1,5,3)', {}, 5],
+    ['3sin(0)', {}, 0],
+    ['pi x', { x: 2 }, 2 * Math.PI],
+    ['(x+1)(x-1)', { x: 3 }, 8],
+    ['2x^2', { x: 3 }, 18],
+    ['sin(x)^2+cos(x)^2', { x: 0.7 }, 1],
+    ['1/(1+x^2)', { x: 1 }, 0.5],
+    ['hypot(x, 3)', { x: 4 }, 5],
+    ['-x', { x: -2 }, 2],
+    ['+x', { x: 5 }, 5],
+    ['x*y-z', { x: 2, y: 3, z: 4 }, 2],
+    ['sqrt(-1)', {}, NaN],
+    ['clamp(x, 0, 1)', { x: 5 }, 1],
+  ];
+
+  const run = (expr, scope) => {
+    const sc = Kit.makeScope(Object.keys(scope));
+    Object.assign(sc, scope);
+    return Kit.compile(expr, Object.keys(scope))(sc);
+  };
+
+  // 先记下编译版的结果
+  const native = cases.map(([e, s]) => run(e, s));
+  Kit.__setNativeCompile(false);
+  const closures = cases.map(([e, s]) => run(e, s));
+  Kit.__setNativeCompile(true);
+
+  const same = (a, b) => (Number.isNaN(a) && Number.isNaN(b)) || Object.is(a, b);
+  const bad = cases.filter((_, i) => !same(native[i], closures[i])).map((c, i) => `${c[0]}:${native[i]}/${closures[i]}`);
+  ok('两条路的结果逐表达式完全一致', bad.length === 0, bad.join(', '));
+  ok('闭包版确实覆盖到了这些用例(不是恒等于 NaN)', cases.every((_, i) => same(native[i], closures[i])));
+  ok('表达式里的函数调用也走通了(用 Object.create 的 scope 原型链)',
+    same(run('sin(pi/2)', {}), (() => { Kit.__setNativeCompile(false); const v = run('sin(pi/2)', {}); Kit.__setNativeCompile(true); return v; })()));
+
+  // 整条管线(采样 + 等值面)也要能在闭包版下跑出同样的东西
+  Kit.__setNativeCompile(false);
+  const d2 = Kit.compute2D(['sin(x)'], { x: [-3, 3], samples: 50 }).series[0];
+  const mesh = Kit.surfaceNets(Kit.compileImplicit('x^2+y^2+z^2=1', ['x', 'y', 'z']),
+    { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 16 });
+  const mask = Kit.makeMask([Kit.compileConstraint('y > 0', ['x', 'y'])]);
+  const sc = Kit.makeScope(['x', 'y']);
+  sc.x = 0; sc.y = 1;
+  const maskOk = mask(sc);
+  Kit.__setNativeCompile(true);
+
+  ok('闭包版下 2D 采样正常', d2.length === 51 && d2.some((p) => p.y !== null && Math.abs(p.y - 1) < 0.05));
+  ok('闭包版下等值面正常', mesh.quads.length > 50, `${mesh.quads.length} 个面`);
+  ok('闭包版下约束判定正常', maskOk === true);
+}
+
 console.log('\n=== 刻度与配色 ===');
 ok('niceStep 给出整齐的步长', [Kit.niceStep(10, 8), Kit.niceStep(1, 8), Kit.niceStep(1000, 5)]
   .every((v) => { const m = v / 10 ** Math.round(Math.log10(v)); return [1, 2, 5].some((k) => near(m, k) || near(m * 10, k)); }));

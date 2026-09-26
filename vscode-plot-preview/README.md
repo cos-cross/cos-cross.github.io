@@ -84,10 +84,20 @@ VSCode Markdown 预览
 1. **解析规则只有一份。** `vendor/plot-build.cjs` 和 `preview/plot.js` 是从
    `scripts/plot.js` / `themes/cos-cross/source/js/plot.js` 同步过来的,不手写第二套。
    所以"编辑器里看到的"永远等于"网站上看到的"。
-2. **渲染器靠 `previewScripts` 注入。** 预览的 CSP 不允许正文里的内联 `<script>`,
+2. **必须声明 `markdown.markdownItPlugins: true`。** ⚠️ 这条最容易漏:
+   VSCode 只对声明了它的扩展调用 `extendMarkdownIt`。
+   少了它,扩展照样会被激活(`markdown.previewScripts` / `previewStyles` 也照常注入),
+   **但那个钩子一次都不会被调用** —— 预览里就一直是代码块原文。
+   如果没有输出面板日志,几乎不可能从现象上看出来。`tools/test-vscode.mjs` 里有一条测试守着它。
+3. **渲染器靠 `previewScripts` 注入。** 预览的 CSP 不允许正文里的内联 `<script>`,
    所以不能把渲染代码塞在 markdown-it 的输出里 —— 只能走 `contributes.markdown.previewScripts`。
-3. **`preview/bootstrap.js` 盯着 DOM 变化。** 预览在编辑时只替换 body 的 HTML、
+4. **`preview/bootstrap.js` 盯着 DOM 变化。** 预览在编辑时只替换 body 的 HTML、
    **不会重新加载脚本**,所以新生成的图没人挂载。那个 MutationObserver 就是干这个的。
+
+顺带一个反直觉的地方:**围栏里的选项没法从 HTML 里捞回来。** markdown-it 只把语言名
+(第一个词)写进 `class="language-plot2d"`,`x=[-7,7] grid=48` 这些全丢了。所以
+"在 webview 里自己解析代码块"这条兜底路是走不通的(会静默用默认参数画出错误的图),
+`extendMarkdownIt` 是唯一正确的接入点。
 
 ## 改了主题的绘图代码之后
 

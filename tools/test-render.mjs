@@ -546,6 +546,40 @@ console.log('\n=== 2D 线段与多边形 ===');
   ok('点在最上层', record.arcs.length >= 3);
 }
 
+console.log('\n=== 禁止 eval 的环境(VSCode 预览的 CSP)也能画 ===');
+{
+  // VSCode 预览的 webview 不允许 unsafe-eval,new Function 会直接抛。
+  // 这里把编译版关掉模拟那个环境,整条链路必须照样跑通。
+  Kit.__setNativeCompile(false);
+  const { record, el } = render('3d', {
+    items: [
+      { type: 'implicit', expr: 'x^2+y^2+z^2=1', constraints: ['z > 0'] },
+      { type: 'point', x: 0, y: 0, z: 1, label: 'Z', constraints: [] },
+      { type: 'segment', a: { x: -1, y: 0, z: 0 }, b: { x: 1, y: 0, z: 0 }, constraints: [] },
+    ],
+    opts: { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 20, alpha: 0.6 },
+  });
+  const fillsBroken = record.fills.length;
+  const arcsBroken = record.arcs.length;
+  Kit.__setNativeCompile(true);
+
+  ok('没有报错、也没有出现红框', !el.dataset.error, errText(record));
+  ok('曲面照常提取出来了', fillsBroken > 100, `${fillsBroken} 个面`);
+  ok('点和线段也在', arcsBroken >= 1);
+
+  // 和编译版的结果对比:面数应该完全一致
+  const native = render('3d', {
+    items: [
+      { type: 'implicit', expr: 'x^2+y^2+z^2=1', constraints: ['z > 0'] },
+      { type: 'point', x: 0, y: 0, z: 1, label: 'Z', constraints: [] },
+      { type: 'segment', a: { x: -1, y: 0, z: 0 }, b: { x: 1, y: 0, z: 0 }, constraints: [] },
+    ],
+    opts: { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 20, alpha: 0.6 },
+  });
+  ok('和编译版画出来的面数一模一样', native.record.fills.length === fillsBroken,
+    `${native.record.fills.length} vs ${fillsBroken}`);
+}
+
 console.log('\n=== 出错时的表现 ===');
 {
   const { el } = render('2d', {

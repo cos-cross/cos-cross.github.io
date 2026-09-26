@@ -197,6 +197,59 @@
     return { implicit: true, lhs: parts[0].trim(), rhs: parts[1].trim() };
   }
 
+  /**
+   * 把 AST 编译成**嵌套闭包** —— 完全不碰 eval / new Function。
+   *
+   * 为什么必须有这条路:**VSCode 的 Markdown 预览 webview 禁止 unsafe-eval**
+   * (CSP 里只有 `script-src 'nonce-…'`),`new Function` 会当场抛
+   * "Evaluating a string as JavaScript violates the following Content Security Policy directive"。
+   * 普通浏览器页面是允许的,所以网站走下面编译版(快),受限环境自动退到这一版。
+   *
+   * 求值顺序、NaN 传播、`^` 是乘方(不是异或)这些必须和编译版逐位一致 ——
+   * tools/test-plot.mjs 里有一条逐表达式的对照测试。
+   */
+  function compileToClosures(node) {
+    switch (node.t) {
+      case 'num': { const v = node.v; return function () { return v; }; }
+      case 'var': { const n = node.name; return function (s) { return s[n]; }; }
+      case 'neg': { const a = compileToClosures(node.a); return function (s) { return -a(s); }; }
+      case 'bin': {
+        const a = compileToClosures(node.a);
+        const b = compileToClosures(node.b);
+        switch (node.op) {
+          case '+': return function (s) { return a(s) + b(s); };
+          case '-': return function (s) { return a(s) - b(s); };
+          case '*': return function (s) { return a(s) * b(s); };
+          case '/': return function (s) { return a(s) / b(s); };
+          case '%': return function (s) { return a(s) % b(s); };
+          case '^': return function (s) { return Math.pow(a(s), b(s)); };
+          default: throw new Error('未知运算符:' + node.op);
+        }
+      }
+      case 'call': {
+        const name = node.name;
+        const args = node.args.map(compileToClosures);
+        const n = args.length;
+        return function (s) {
+          const f = s[name];
+          if (typeof f !== 'function') return NaN;
+          const xs = new Array(n);
+          for (let i = 0; i < n; i++) xs[i] = args[i](s);
+          return f.apply(null, xs);
+        };
+      }
+      default: throw new Error('未知节点:' + node.t);
+    }
+  }
+
+  /**
+   * `new Function` 能不能用?普通页面能,限制 CSP 的 webview 里不能。
+   * 载入时试一次就够了 —— 这也正是"预览里全是红框"那条报错的来源。
+   */
+  let NATIVE_COMPILE = (function () {
+    try { return new Function('return 1')() === 1; } catch (e) { return false; }
+  })();
+
   function compileAst(ast, allowedVars) {
     const names = collectNames(ast);
 
@@ -212,12 +265,17 @@
       throw new Error('未知符号:"' + name + '"(可用变量:' + (allowedVars || []).join(', ') + ')');
     });
 
-    const body = 'return ' + toJS(ast) + ';';
     let fn;
-    try {
-      fn = new Function('s', body); // 代码串完全由 AST 拼出来,不含用户原始输入
-    } catch (e) {
-      throw new Error('表达式无法编译:' + e.message);
+    if (NATIVE_COMPILE) {
+      const body = 'return ' + toJS(ast) + ';';
+      try {
+        fn = new Function('s', body); // 代码串完全由 AST 拼出来,不含用户原始输入
+      } catch (e) {
+        throw new Error('表达式无法编译:' + e.message);
+      }
+    } else {
+      // CSP 不让动态求值(VSCode 预览就是这样):退到闭包版,结果一样、只是慢些
+      fn = compileToClosures(ast);
     }
     return function (scope) {
       const v = fn(scope);
@@ -2248,6 +2306,10 @@
   return {
     // 供 Node 侧单测使用
     tokenize: tokenize,
+    compileToClosures: compileToClosures,
+    /** 测试用:强行关掉/打开编译版,验证两条路结果一致 */
+    __setNativeCompile: function (on) { NATIVE_COMPILE = !!on; },
+    __nativeCompile: function () { return NATIVE_COMPILE; },
     parse: parse,
     compile: compile,
     makeScope: makeScope,

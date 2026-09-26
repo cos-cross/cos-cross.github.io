@@ -155,6 +155,15 @@ console.log('\n=== 用真的 markdown-it 跑一遍 ===');
 console.log('\n=== 打包 (.vsix) 的前置条件 ===');
 {
   const pkg = JSON.parse(readFileSync(path.join(extDir, 'package.json'), 'utf8'));
+
+  // 就是这一条:VSCode 只对声明了 markdownItPlugins 的扩展调用 extendMarkdownIt。
+  // 少了它,扩展照样被激活(previewScripts / previewStyles 也会照常注入),
+  // 但那个钩子**一次都不会被调用** —— 预览里就一直是代码块原文。
+  // 这是实际踩过的坑,别再删。
+  ok('声明了 markdown.markdownItPlugins(VSCode 靠它才会调 extendMarkdownIt)',
+    pkg.contributes['markdown.markdownItPlugins'] === true,
+    String(pkg.contributes['markdown.markdownItPlugins']));
+
   ok('有 name / publisher / version', !!(pkg.name && pkg.publisher && /^\d+\.\d+\.\d+$/.test(pkg.version)),
     `${pkg.publisher}.${pkg.name}@${pkg.version}`);
   ok('声明了 engines.vscode', !!pkg.engines && !!pkg.engines.vscode, pkg.engines && pkg.engines.vscode);
