@@ -1277,6 +1277,98 @@
     return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
   }
 
+  /* ---------- 采样盒子装不装得下 ---------- */
+
+  /**
+   * 在某个面上采样,看函数的符号有没有变化 —— 有就说明零等值面穿过了这个面,
+   * 也就是"这个面把图形切了"。
+   *
+   * axis 指定这个面垂直于哪个轴:0=x、1=y、2=z,value 是面的位置。
+   */
+  function faceCrossed(fn, axis, value, rx, ry, rz, n) {
+    const scope = makeScope(['x', 'y', 'z']);
+    const u = axis === 0 ? ry : rx;
+    const v = axis === 2 ? ry : rz;
+    const sign = (us, vs) => {
+      if (axis === 0) { scope.x = value; scope.y = us; scope.z = vs; } else if (axis === 1) {
+        scope.x = us; scope.y = value; scope.z = vs;
+      } else { scope.x = us; scope.y = vs; scope.z = value; }
+      const r = fn(scope);
+      return Number.isFinite(r) ? (r > 0 ? 1 : -1) : 0;
+    };
+    const rowPrev = [];
+    for (let i = 0; i <= n; i++) {
+      const us = u[0] + (u[1] - u[0]) * (i / n);
+      let leftPrev = 0;
+      for (let j = 0; j <= n; j++) {
+        const vs = v[0] + (v[1] - v[0]) * (j / n);
+        const s = sign(us, vs);
+        if (s !== 0) {
+          if (leftPrev !== 0 && s !== leftPrev) return true;
+          if (rowPrev[j] !== undefined && rowPrev[j] !== 0 && s !== rowPrev[j]) return true;
+        }
+        leftPrev = s;
+        rowPrev[j] = s;
+      }
+    }
+    return false;
+  }
+
+  var BOX_GROW = 1.2;       // 每轮撑大的倍数
+  var BOX_MAX_STEPS = 10;   // 最多撑几轮(病态表达式保护)
+  var BOX_FACE_RES = 14;    // 每个面的采样密度
+
+  /**
+   * 求"刚好装得下这些隐式曲面"的采样盒子。
+   *
+   * 作者的 `x=` `y=` `z=` 是**采样盒子**:零等值面一旦伸到盒子外面,
+   * 那一部分就直接没了 —— 表现出来就是"周围那几个球只剩一点点边的碎片",
+   * 而且一声不响。这里在盒子 6 个面上采样,看每个曲面的符号有没有变化,
+   * 有就把那个轴往外撑,直到装下为止。
+   *
+   * 每轮多给一格(`span/n`),保证曲面是**严格在内**而不是贴着面 ——
+   * surface nets 在贴面的那一圈会缺面片。
+   *
+   * 返回 `{ x, y, z, expanded }`,ranges 的格式和 `opts.x` 一样是 `[a, b]`。
+   */
+  function fitImplicitBox(fns, range) {
+    let x = range.x.slice();
+    let y = range.y.slice();
+    let z = range.z.slice();
+    let expanded = false;
+
+    const grow = (r) => {
+      const c = (r[0] + r[1]) / 2;
+      const half = (r[1] - r[0]) / 2;
+      const nh = half * BOX_GROW + (r[1] - r[0]) / BOX_FACE_RES;
+      return [c - nh, c + nh];
+    };
+
+    for (let step = 0; step < BOX_MAX_STEPS; step++) {
+      let cutX = false;
+      let cutY = false;
+      let cutZ = false;
+      for (let f = 0; f < fns.length; f++) {
+        const fn = fns[f];
+        if (!cutX && (faceCrossed(fn, 0, x[0], x, y, z, BOX_FACE_RES)
+          || faceCrossed(fn, 0, x[1], x, y, z, BOX_FACE_RES))) cutX = true;
+        if (!cutY && (faceCrossed(fn, 1, y[0], x, y, z, BOX_FACE_RES)
+          || faceCrossed(fn, 1, y[1], x, y, z, BOX_FACE_RES))) cutY = true;
+        if (!cutZ && (faceCrossed(fn, 2, z[0], x, y, z, BOX_FACE_RES)
+          || faceCrossed(fn, 2, z[1], x, y, z, BOX_FACE_RES))) cutZ = true;
+        if (cutX && cutY && cutZ) break;
+      }
+      if (!cutX && !cutY && !cutZ) break;
+
+      expanded = true;
+      if (cutX) x = grow(x);
+      if (cutY) y = grow(y);
+      if (cutZ) z = grow(z);
+      if (x[1] - x[0] > 1e6 || y[1] - y[0] > 1e6 || z[1] - z[0] > 1e6) break;
+    }
+    return { x, y, z, expanded };
+  }
+
   /**
    * 收集"算适配比例用的探针点"。
    *
@@ -2166,6 +2258,8 @@
     rotatePoint: rotatePoint,
     contentProbes: contentProbes,
     fitZoom: fitZoom,
+    fitImplicitBox: fitImplicitBox,
+    faceCrossed: faceCrossed,
     colormap: colormap,
     niceStep: niceStep,
     GRID_LIMITS: GRID_LIMITS,

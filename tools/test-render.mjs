@@ -572,7 +572,9 @@ console.log('\n=== 构建产物里的真实载荷(端到端) ===');
     let exploded = 0;
     let empty = 0;
     let clipped = 0;
+    let slit = 0;
     const clippedNames = [];
+    const slitNames = [];
     const kinds = new Set();
     for (const page of pages) {
       const html = fs.readFileSync(page, 'utf8');
@@ -610,6 +612,20 @@ console.log('\n=== 构建产物里的真实载荷(端到端) ===');
               clippedNames.push(`x=[${payload.opts.x}] y=[${payload.opts.y}] 溢出 ${over.toFixed(0)}px`);
             }
           }
+
+          // 隐式曲面的采样盒子必须装得下所有曲面 —— 否则球会被切成碎片。
+          // 构建期插件已经会自动撑开并给出警告,这里守着"发出来的载荷一定够大"。
+          const implicit = (payload.items || []).filter((it) => it.type === 'implicit');
+          if (implicit.length && Array.isArray(payload.opts.z)) {
+            const fns = implicit.map((it) => Kit.compileImplicit(it.expr, ['x', 'y', 'z']));
+            const again = Kit.fitImplicitBox(fns, {
+              x: payload.opts.x, y: payload.opts.y, z: payload.opts.z,
+            });
+            if (again.expanded) {
+              slit += 1;
+              slitNames.push(`x=[${payload.opts.x.map((v) => v.toFixed(2))}] ${implicit.length} 个曲面`);
+            }
+          }
         }
       }
     }
@@ -620,6 +636,8 @@ console.log('\n=== 构建产物里的真实载荷(端到端) ===');
       [...kinds].join(','));
     ok('每张 3D 图打开时都完整可见(没有一个被画布切掉)', clipped === 0,
       `${clipped} 张被切:${clippedNames.slice(0, 3).join('; ')}`);
+    ok('没有一张图的曲面被采样盒子切成碎片', slit === 0,
+      `${slit} 张被切:${slitNames.slice(0, 3).join('; ')}`);
     console.log(`       跑了 ${total} 张图,图元类型:${[...kinds].join(' / ')}`);
   }
 }

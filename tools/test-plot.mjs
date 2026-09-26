@@ -600,6 +600,83 @@ console.log('\n=== 自动适配镜头(内容不会被画布切掉) ===');
   })());
 }
 
+console.log('\n=== 采样盒子装不装得下(球只剩碎片的那个 bug) ===');
+{
+  const sphere = (x, y, z) => Kit.compileImplicit(
+    Kit.sphereEquation({ x, y, z }, 1), ['x', 'y', 'z'],
+  );
+
+  // faceCrossed:半径为 1 的球,f = x²+y²+z²-1
+  const fn0 = sphere(0, 0, 0);
+  ok('面切过球 → 判为被切', Kit.faceCrossed(fn0, 0, 0.5, [-2, 2], [-2, 2], [-2, 2], 12) === true);
+  ok('面在球外面 → 判为没切', Kit.faceCrossed(fn0, 0, 1.5, [-2, 2], [-2, 2], [-2, 2], 12) === false);
+  ok('三个轴都认', Kit.faceCrossed(fn0, 1, -0.5, [-2, 2], [-2, 2], [-2, 2], 12) === true
+    && Kit.faceCrossed(fn0, 2, 0.9, [-2, 2], [-2, 2], [-2, 2], 12) === true);
+
+  // 盒子够大 → 原样返回
+  const fine = Kit.fitImplicitBox([fn0], { x: [-2, 2], y: [-2, 2], z: [-2, 2] });
+  ok('装得下时不动盒子', fine.expanded === false
+    && fine.x[0] === -2 && fine.x[1] === 2 && fine.z[1] === 2);
+
+  // 球心挪到 (2,0,0),盒子还是 [-1.05,1.05] —— 这正是用户踩的坑
+  const off = Kit.fitImplicitBox([sphere(2, 0, 0)], { x: [-1.05, 1.05], y: [-1.05, 1.05], z: [-1.05, 1.05] });
+  ok('球伸出盒子时会被撑开', off.expanded === true);
+  ok('x 撑到装得下整个球(需要 ±3)', off.x[0] <= -3 && off.x[1] >= 3, JSON.stringify(off.x));
+  ok('y/z 本来就够,不会被无谓地撑大', off.y[0] === -1.05 && off.z[1] === 1.05);
+  ok('撑完就真的不切了:再检测一次应该干净',
+    Kit.fitImplicitBox([sphere(2, 0, 0)], { x: off.x, y: off.y, z: off.z }).expanded === false);
+
+  // 用户的真实场景:14 / 17 个球塞在 ±1.05 的盒子里
+  for (const [name, list] of [
+    ['面心立方 14 球', (() => {
+      const s = Math.SQRT2; const c = [];
+      for (const x of [-s, s]) for (const y of [-s, s]) for (const z of [-s, s]) c.push([x, y, z]);
+      c.push([0, 0, s], [0, 0, -s], [0, s, 0], [0, -s, 0], [s, 0, 0], [-s, 0, 0]);
+      return c;
+    })()],
+    ['六方最密 17 球', (() => {
+      const h = Math.sqrt(8 / 3);
+      const hex = [[2, 0], [1, Math.sqrt(3)], [-1, Math.sqrt(3)], [-2, 0], [-1, -Math.sqrt(3)], [1, -Math.sqrt(3)], [0, 0]];
+      const mid = [[1, Math.sqrt(3) / 3], [-1, Math.sqrt(3) / 3], [0, -2 * Math.sqrt(3) / 3]];
+      const c = [];
+      hex.forEach(([x, y]) => c.push([x, y, -h]));
+      mid.forEach(([x, y]) => c.push([x, y, 0]));
+      hex.forEach(([x, y]) => c.push([x, y, h]));
+      return c;
+    })()],
+  ]) {
+    const fns = list.map(([x, y, z]) => sphere(x, y, z));
+    const fit = Kit.fitImplicitBox(fns, { x: [-1.05, 1.05], y: [-1.05, 1.05], z: [-1.05, 1.05] });
+    ok(`${name}:被撑开了`, fit.expanded === true);
+    ok(`${name}:撑完后再检测没有残留的切面`,
+      Kit.fitImplicitBox(fns, { x: fit.x, y: fit.y, z: fit.z }).expanded === false);
+    // 装得下 = 每个球都完整:网格面积应接近理论 4πr²
+    const half = Math.max(fit.x[1] - fit.x[0], fit.y[1] - fit.y[0], fit.z[1] - fit.z[0]) / 2;
+    const ratios = fns.map((fn) => {
+      const mesh = Kit.surfaceNets(fn, { x: fit.x, y: fit.y, z: fit.z, grid: 24 });
+      let s = 0;
+      for (const q of mesh.quads) {
+        const v = q.map((i) => mesh.verts[i]);
+        for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]]) {
+          const A = v[a]; const B = v[b]; const C = v[c];
+          const ux = B.x - A.x; const uy = B.y - A.y; const uz = B.z - A.z;
+          const vx = C.x - A.x; const vy = C.y - A.y; const vz = C.z - A.z;
+          s += 0.5 * Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx);
+        }
+      }
+      return s * half * half / (4 * Math.PI);
+    });
+    ok(`${name}:每个球都完整(面积≥理论的 93%)`, Math.min(...ratios) >= 0.93,
+      `最小 ${Math.min(...ratios).toFixed(3)}`);
+  }
+
+  // 病态表达式不能把构建卡死
+  const wild = Kit.compileImplicit('exp(x)+exp(y)+exp(z)=0', ['x', 'y', 'z']);
+  const t0 = Date.now();
+  Kit.fitImplicitBox([wild], { x: [-1, 1], y: [-1, 1], z: [-1, 1] });
+  ok('病态表达式不会无限撑下去(有轮数上限)', Date.now() - t0 < 3000, `${Date.now() - t0}ms`);
+}
+
 console.log('\n=== 刻度与配色 ===');
 ok('niceStep 给出整齐的步长', [Kit.niceStep(10, 8), Kit.niceStep(1, 8), Kit.niceStep(1000, 5)]
   .every((v) => { const m = v / 10 ** Math.round(Math.log10(v)); return [1, 2, 5].some((k) => near(m, k) || near(m * 10, k)); }));

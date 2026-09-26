@@ -483,6 +483,26 @@ hexo.extend.filter.register('after_post_render', function (data) {
           grid,
         };
 
+      // 作者的 x/y/z 是**采样盒子**:隐式曲面的零等值面一旦伸出盒子,
+      // 那一部分就被静默切掉了 —— 表现得就像"周围那几个球只剩一点点边的碎片"。
+      // 这里在盒子 6 个面上探测符号变化,一旦发现被切就把盒子撑到装得下,
+      // 并把建议的范围报给作者(自己写对能省下不少网格精度)。
+      if (anyImplicit) {
+        const fns = surfaces
+          .filter((it) => it.type === 'implicit')
+          .map((it) => Kit.compileImplicit(it.expr, ['x', 'y', 'z']));
+        const fitBox = Kit.fitImplicitBox(fns, { x: o2.x, y: o2.y, z: o2.z });
+        if (fitBox.expanded) {
+          const show = (r) => `[${Number(r[0].toFixed(3))}, ${Number(r[1].toFixed(3))}]`;
+          problems.push(`${data.source}:曲面伸出了 x/y/z 范围,有一角被切掉了。建议把范围写成 `
+            + `x=${show(fitBox.x)} y=${show(fitBox.y)} z=${show(fitBox.z)}`
+            + `(这次先自动撑到这么大)`);
+          o2.x = fitBox.x;
+          o2.y = fitBox.y;
+          o2.z = fitBox.z;
+        }
+      }
+
       // 曲面透明度。作者写了 alpha= / opacity= 就用他的;
       // 没写时"多个曲面"默认半透明 —— 否则前面的曲面会把后面的全挡住,
       // 叠四个球看起来还是一个球。单个曲面保持不透明(实心的更好看)。
