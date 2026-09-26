@@ -33,7 +33,7 @@ date: 2026-04-10 20:00:00
 
 - **GitHub**: {% social_badge GitHub %}
 - **Bilibili**: {% social_badge Bilibili %}
-- **邮箱**: Cosinecross@163.com
+- **邮箱**: {% social_badge 邮箱 %}
 
 <div class="callout">
   <span class="callout-icon">♪</span>

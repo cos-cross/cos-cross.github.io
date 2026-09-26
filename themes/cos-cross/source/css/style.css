@@ -1776,6 +1776,19 @@ p { margin: 0; }
   transition: opacity .2s var(--ease);
 }
 a:hover > .social-badge, a:focus-visible > .social-badge { opacity: 1; }
+/* ⚠️ 正文里的徽章必须"跟着文字走",不能走插图那套样式:
+   `.post-content img` 是给插图准备的 —— display:block + margin:1.6em auto + 边框阴影,
+   徽章会被顶成居中独占一行、上下还各空 1.6em。所以这里用更高的选择器把那些全抵消掉,
+   让它老老实实待在标签文字后面。 */
+.post-content img.social-badge,
+.page-content img.social-badge {
+  display: inline-block;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  vertical-align: middle;
+}
 /* 用 Markdown 直接写的徽章(![](https://img.shields.io/...))没有 class,
    按域名兜一下基线对齐 */
 .page-content img[src*="img.shields.io"] { vertical-align: middle; }
