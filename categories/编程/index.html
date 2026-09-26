@@ -24,7 +24,9 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/img/apple-touch-icon.png">
   
   <link rel="alternate" type="application/atom+xml" title="Cos-CrossのBlogger" href="/atom.xml">
-  <link rel="stylesheet" href="/css/style.css">
+  <!-- 样式表挂 ?v=<内容指纹>:GitHub Pages 的 CSS 缓存是 10 分钟,
+       不带版本号的话改了样式、HTML 更新了、浏览器还在用旧 CSS(见 tools/asset-version.cjs) -->
+  <link rel="stylesheet" href="/css/style.css?v=afd53ca3">
   
 <meta name="generator" content="Hexo 8.1.2"></head>
 
@@ -288,7 +290,10 @@ RSS / Atom</a></li>
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5l7 7-1.4 1.4L13 8.8V19h-2V8.8L6.4 13.4 5 12z" fill="currentColor"/></svg>
   </button>
 
-  <script src="/js/main.js"></script>
+  <!-- ?v=<内容指纹> 是缓存版本号:payload 结构变过(加了约束和点),不带版本号的话
+       浏览器可能拿旧缓存去配新页面,图会画错甚至报错。以前这里是手写的 ?v=12,
+       现在由 asset_v() 按文件内容自动算,改完脚本不用记得手动加号。 -->
+  <script src="/js/main.js?v=d1a1ba9a"></script>
   
 </body>
 </html>
