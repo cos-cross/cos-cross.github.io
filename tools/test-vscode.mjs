@@ -7,7 +7,7 @@
  */
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
-import { closeSync, openSync, readFileSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -97,6 +97,104 @@ console.log('\n=== 预览脚本 ===');
   ok('样式里带着主题的设计变量', css.includes('.plot {') && css.includes('--grad-main'));
   ok('浅色主题的覆盖映射到了 vscode-light', css.includes('body.vscode-light'));
   ok('样式不污染预览的全局作用域', !/^:root\s*\{/m.test(css));
+}
+
+console.log('\n=== 用真的 markdown-it 跑一遍 ===');
+{
+  // 上面那一段用的是个假 md 对象,只能证明"我的钩子逻辑对";
+  // 这一段把插件挂到**真的 markdown-it** 上渲染,才能排除"真库里的行为不一样"。
+  // (markdown-it 只是 devDependency,缺了就跳过,不影响构建。)
+  let MarkdownIt = null;
+  try { MarkdownIt = require('markdown-it'); } catch { /* 没装 */ }
+
+  if (!MarkdownIt) {
+    console.log('SKIP  没装 markdown-it(在仓库里跑 npm install 就会有)');
+  } else {
+    const doc = [
+      '# 标题',
+      '',
+      '正文 $\alpha$ 一段。',
+      '',
+      '```plot2d x=[-7,7] y=[-2,2]',
+      'sin(x)',
+      '```',
+      '',
+      '```plot3d x=[-2,2] y=[-2,2] z=[-2,2] grid=24',
+      'sphere(0, 0, 0, 1)',
+      '```',
+      '',
+      '```python',
+      'print(1)',
+      '```',
+      '',
+      '```plot2d',
+      'nope(',
+      '```',
+      '',
+    ].join('\n');
+
+    // 完全按 VSCode 的用法:先建实例,再把扩展返回的 md 拿去 render
+    const md = MarkdownIt({ html: true, linkify: true, breaks: true });
+    const api = require(path.join(extDir, 'extension.js')).activate(null);
+    const html = api.extendMarkdownIt(md).render(doc);
+
+    const count = (re) => (html.match(re) || []).length;
+    ok('渲染出 2 个容器', count(/<div class="plot"/g) === 2, `${count(/<div class="plot"/g)} 个`);
+    ok('2D / 3D 各一个', count(/data-kind="2d"/g) === 1 && count(/data-kind="3d"/g) === 1);
+    ok('容器里带着可解析的 JSON', (() => {
+      const m = /<script type="application\/json">([\s\S]*?)<\/script>/.exec(html);
+      return !!m && JSON.parse(m[1].replace(/\\u003c/g, '<')).items.length >= 1;
+    })());
+    ok('python 代码块原样保留', /language-python/.test(html) && /print\(1\)/.test(html));
+    ok('没有漏网的 plot 围栏', count(/language-plot2d/g) === 0 && count(/language-plot3d/g) === 0);
+    ok('坏表达式变成红框', count(/plot-preview-error-title/g) === 1);
+    ok('正文没被动过', html.includes('<h1>标题</h1>') && html.includes('正文'));
+  }
+}
+
+console.log('\n=== 打包 (.vsix) 的前置条件 ===');
+{
+  const pkg = JSON.parse(readFileSync(path.join(extDir, 'package.json'), 'utf8'));
+  ok('有 name / publisher / version', !!(pkg.name && pkg.publisher && /^\d+\.\d+\.\d+$/.test(pkg.version)),
+    `${pkg.publisher}.${pkg.name}@${pkg.version}`);
+  ok('声明了 engines.vscode', !!pkg.engines && !!pkg.engines.vscode, pkg.engines && pkg.engines.vscode);
+  ok('入口文件存在', existsSync(path.join(extDir, pkg.main)), pkg.main);
+  ok('许可证文件在(LICENSE 会被改名成 LICENSE.txt 进包)',
+    existsSync(path.join(extDir, 'LICENSE')));
+  ok('有 README(市场页和「详情」都用它)', existsSync(path.join(extDir, 'README.md')));
+
+  // 没有运行时依赖 —— tools/package-vscode.mjs 就是靠这一点才敢用 --no-dependencies
+  ok('没有运行时依赖(所以能用 --no-dependencies 打包)',
+    !pkg.dependencies || Object.keys(pkg.dependencies).length === 0,
+    JSON.stringify(pkg.dependencies));
+
+  // contributes 里写到的每个文件都必须真的在,不然装上是个哑巴扩展
+  const declared = [
+    ...(pkg.contributes['markdown.previewStyles'] || []),
+    ...(pkg.contributes['markdown.previewScripts'] || []),
+  ];
+  const missing = declared.filter((rel) => !existsSync(path.join(extDir, rel)));
+  ok('contributes 里声明的文件都存在', missing.length === 0, missing.join(', '));
+
+  // .vscodeignore 把不该带的排掉,但别把要用的也排掉了
+  const ignore = readFileSync(path.join(extDir, '.vscodeignore'), 'utf8')
+    .split('\n').map((s) => s.trim()).filter((s) => s && !s.startsWith('#'));
+  const needed = [pkg.main.replace(/^\.\//, ''), 'package.json', 'README.md', 'LICENSE',
+    ...declared.map((r) => r.replace(/^\.\//, ''))];
+  const wronglyIgnored = needed.filter((f) => ignore.some((pat) => {
+    if (pat.endsWith('/**')) return f.startsWith(pat.slice(0, -3));
+    if (pat.startsWith('*.')) return f.endsWith(pat.slice(1));
+    return f === pat;
+  }));
+  ok('.vscodeignore 没把要用的文件排掉', wronglyIgnored.length === 0, wronglyIgnored.join(', '));
+
+  const vsix = path.join(extDir, `${pkg.name}-${pkg.version}.vsix`);
+  if (existsSync(vsix)) {
+    ok('已经打过包了,而且不是空的', readFileSync(vsix).length > 10000,
+      `${Math.round(readFileSync(vsix).length / 1024)} KB`);
+  } else {
+    console.log('SKIP  还没打过包(跑 npm run vscode:package)');
+  }
 }
 
 console.log(`\n${pass} 通过,${fail} 失败`);

@@ -2,9 +2,14 @@
   "name": "plot-preview",
   "displayName": "函数图像预览(plot2d / plot3d)",
   "description": "在 VSCode 自带的 Markdown 预览里直接渲染 plot2d / plot3d 代码块,和博客用的是同一个渲染核心。",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "cos-cross",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cos-cross/cos-cross.github.io.git",
+    "directory": "vscode-plot-preview"
+  },
   "engines": {
     "vscode": "^1.75.0"
   },
@@ -15,13 +20,22 @@
     "markdown",
     "plot",
     "math",
-    "canvas"
+    "canvas",
+    "hexo"
   ],
   "activationEvents": [
+    "*",
     "onLanguage:markdown"
   ],
   "main": "./extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "plot-preview.diagnose",
+        "title": "函数图像预览:诊断",
+        "category": "plot-preview"
+      }
+    ],
     "markdown.previewStyles": [
       "./preview/plot.css"
     ],

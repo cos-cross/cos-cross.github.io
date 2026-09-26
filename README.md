@@ -947,8 +947,9 @@ $$
 (`vendor/plot-build.cjs`)都是从主题同步过来的,所以编辑器里看到的和网站上看到的一定一致。
 
 ```bash
-npm run vscode:sync     # 从主题同步这三份文件
-npm run vscode:check    # 只检查是否一致(npm run check 里也会跑)
+npm run vscode:sync      # 从主题同步这三份文件
+npm run vscode:check     # 只检查是否一致(npm run check 里也会跑)
+npm run vscode:package   # 打成 plot-preview-1.0.0.vsix,能直接「从 VSIX 安装」
 ```
 
 装法与实现细节见 `vscode-plot-preview/README.md`。忘了同步的话测试会红,不会悄悄跑偏。

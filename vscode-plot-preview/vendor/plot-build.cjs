@@ -328,7 +328,7 @@ function buildPlotBlock(kind, optsRaw, code, source) {
         try {
           Kit.compileConstraint(c, vars);
         } catch (e) {
-          problems.push(`${data.source}:"${c}" —— ${e.message}`);
+          problems.push(`${source}:"${c}" —— ${e.message}`);
         }
       });
 
@@ -340,7 +340,7 @@ function buildPlotBlock(kind, optsRaw, code, source) {
             });
           });
         } catch (e) {
-          problems.push(`${data.source}:"${line}" —— ${e.message}`);
+          problems.push(`${source}:"${line}" —— ${e.message}`);
         }
       } else if (CENTERS_RE.test(base)) {
         // `centers`:在每个球心(以及已定义的点)位置打一个点
@@ -358,7 +358,7 @@ function buildPlotBlock(kind, optsRaw, code, source) {
           if (!(d > 0)) throw new Error('距离要大于 0,现在是 ' + d);
           linkSpecs.push({ d, conds, source: line.trim() });
         } catch (e) {
-          problems.push(`${data.source}:"${line}" —— ${e.message}`);
+          problems.push(`${source}:"${line}" —— ${e.message}`);
         }
       } else if (SHAPE_RE.test(base)) {
         // 线段 / 多边形。顶点可以引用同一块里定义的点(靠标签),
@@ -378,12 +378,12 @@ function buildPlotBlock(kind, optsRaw, code, source) {
           }
           shapes.push({ kind: isSegment ? 'segment' : 'polygon', refs, conds, source: line.trim() });
         } catch (e) {
-          problems.push(`${data.source}:"${line}" —— ${e.message}`);
+          problems.push(`${source}:"${line}" —— ${e.message}`);
         }
       } else if (/^sphere\s*\(/i.test(base)) {
         // 球面:sphere(球心, 半径) 或 sphere(x, y, z, r)
         if (kind !== '3d') {
-          problems.push(`${data.source}:"${line}" —— 球面是 3D 的;plot2d 里请写成 x^2 + y^2 = r^2 这种方程`);
+          problems.push(`${source}:"${line}" —— 球面是 3D 的;plot2d 里请写成 x^2 + y^2 = r^2 这种方程`);
         } else {
           try {
             const call = Kit.parseCallArgs(base, 'sphere');
@@ -413,7 +413,7 @@ function buildPlotBlock(kind, optsRaw, code, source) {
             }
             spheres.push({ center, centerRef, centerText, radius, radiusRaw, conds, source: line.trim() });
           } catch (e) {
-            problems.push(`${data.source}:"${line}" —— ${e.message}`);
+            problems.push(`${source}:"${line}" —— ${e.message}`);
           }
         }
       } else if (!conds.length && /<=|>=|<|>/.test(base)) {
@@ -422,10 +422,10 @@ function buildPlotBlock(kind, optsRaw, code, source) {
           Kit.compileConstraint(base, vars);
           globalConds.push(base);
         } catch (e) {
-          problems.push(`${data.source}:"${line}" —— ${e.message}`);
+          problems.push(`${source}:"${line}" —— ${e.message}`);
         }
       } else if (/<=|>=|<|>/.test(base)) {
-        problems.push(`${data.source}:"${line}" —— 约束条件本身不能再跟 where`);
+        problems.push(`${source}:"${line}" —— 约束条件本身不能再跟 where`);
       } else if (base.includes('=')) {
         const dep = kind === '3d' ? 'z' : 'y';
         const asFn = asExplicit(base, dep);
@@ -434,14 +434,14 @@ function buildPlotBlock(kind, optsRaw, code, source) {
             Kit.compile(asFn, kind === '3d' ? ['x', 'y'] : ['x']);
             items.push({ type: 'explicit', expr: asFn, constraints: conds });
           } catch (e) {
-            problems.push(`${data.source}:"${line}" —— ${e.message}`);
+            problems.push(`${source}:"${line}" —— ${e.message}`);
           }
         } else {
           try {
             Kit.compileImplicit(base, kind === '3d' ? vars : ['x', 'y']);
             items.push({ type: 'implicit', expr: base, constraints: conds });
           } catch (e) {
-            problems.push(`${data.source}:"${line}" —— ${e.message}${optionHint(base)}`);
+            problems.push(`${source}:"${line}" —— ${e.message}${optionHint(base)}`);
           }
         }
       } else {
@@ -449,7 +449,7 @@ function buildPlotBlock(kind, optsRaw, code, source) {
           Kit.compile(base, kind === '3d' ? ['x', 'y'] : ['x']);
           items.push({ type: 'explicit', expr: base, constraints: conds });
         } catch (e) {
-          problems.push(`${data.source}:"${line}" —— ${e.message}`);
+          problems.push(`${source}:"${line}" —— ${e.message}`);
         }
       }
     });
@@ -460,7 +460,7 @@ function buildPlotBlock(kind, optsRaw, code, source) {
     items.forEach((it) => {
       if (it.type !== 'point' || !it.label) return;
       if (byLabel.has(it.label)) {
-        problems.push(`${data.source}:点的标签「${it.label}」重复定义了,引用它时用最先出现的那个`);
+        problems.push(`${source}:点的标签「${it.label}」重复定义了,引用它时用最先出现的那个`);
         return;
       }
       byLabel.set(it.label, it);
@@ -489,7 +489,7 @@ function buildPlotBlock(kind, optsRaw, code, source) {
           items.push({ type: 'polygon', points: pts, constraints: sh.conds });
         }
       } catch (e) {
-        problems.push(`${data.source}:"${sh.source}" —— ${e.message}`);
+        problems.push(`${source}:"${sh.source}" —— ${e.message}`);
       }
     });
 
@@ -510,7 +510,7 @@ function buildPlotBlock(kind, optsRaw, code, source) {
           constraints: sp.conds,
         });
       } catch (e) {
-        problems.push(`${data.source}:"${sp.source}" —— ${e.message}`);
+        problems.push(`${source}:"${sp.source}" —— ${e.message}`);
       }
     });
 
@@ -531,7 +531,7 @@ function buildPlotBlock(kind, optsRaw, code, source) {
     items.filter((it) => it.type === 'point').forEach(addLattice);
 
     if ((wantCenters.length || linkSpecs.length) && !lattice.length) {
-      problems.push(`${data.source}:centers / links 需要先有球面或者点,这一块里一个都没有`);
+      problems.push(`${source}:centers / links 需要先有球面或者点,这一块里一个都没有`);
     }
 
     if (wantCenters.length) {
@@ -554,7 +554,7 @@ function buildPlotBlock(kind, optsRaw, code, source) {
         });
       });
       if (made > 200) {
-        problems.push(`${data.source}:links 生成了 ${made} 条线段,太多了拖动会卡;`
+        problems.push(`${source}:links 生成了 ${made} 条线段,太多了拖动会卡;`
           + '限制一下范围或者把距离写准一点');
       }
     }
@@ -602,8 +602,8 @@ function buildPlotBlock(kind, optsRaw, code, source) {
 
     if (kind === '3d') {
       if (!curves.length && !points.length && !hasShape) {
-        problems.push(`${data.source}:一个 plot3d 代码块里没有可画的式子`);
-        return whole;
+        problems.push(`${source}:一个 plot3d 代码块里没有可画的式子`);
+        return null;
       }
       // 一个图里可以叠多个曲面/等值面(比如正四面体堆积的四个相切球、
       // 六方最密堆积晶胞的 17 个球),上限纯粹是防手滑:再多就该拆成几张图了。
@@ -611,14 +611,14 @@ function buildPlotBlock(kind, optsRaw, code, source) {
       const MAX_SURFACES = 32;
       const surfaces = curves.slice(0, MAX_SURFACES);
       if (curves.length > MAX_SURFACES) {
-        problems.push(`${data.source}:3D 最多叠 ${MAX_SURFACES} 个曲面,超出的被忽略了`);
+        problems.push(`${source}:3D 最多叠 ${MAX_SURFACES} 个曲面,超出的被忽略了`);
       }
       // 隐式方程(f(x,y,z)=0)和显式曲面(z=...)的默认范围、网格数、归一化方式都不同,
       // 混在同一个代码块里会互相打架,所以拆开判断并给个提醒。
       const anyImplicit = surfaces.some((it) => it.type === 'implicit');
       const anyExplicit = surfaces.some((it) => it.type !== 'implicit');
       if (anyImplicit && anyExplicit) {
-        problems.push(`${data.source}:同一个 plot3d 里混了隐式方程和 z=... 曲面,建议拆成两个代码块`);
+        problems.push(`${source}:同一个 plot3d 里混了隐式方程和 z=... 曲面,建议拆成两个代码块`);
       }
       // 网格密度的上下限和渲染器共用一份(Kit.GRID_LIMITS)—— 两边各写一套
       // 就会出现"插件说最多 80、渲染器偷偷夹到 64",作者写了 80 却拿到 64 的图
@@ -627,7 +627,7 @@ function buildPlotBlock(kind, optsRaw, code, source) {
       const gridLimit = Kit.GRID_LIMITS[gridKind];
       const grid = Kit.clampGrid(o.grid, gridKind);
       if (Number.isFinite(o.grid) && Math.round(o.grid) !== grid) {
-        problems.push(`${data.source}:grid=${o.grid} 超出${anyImplicit ? '隐式' : '显式'} 3D 允许的 `
+        problems.push(`${source}:grid=${o.grid} 超出${anyImplicit ? '隐式' : '显式'} 3D 允许的 `
           + `${gridLimit.min}~${gridLimit.max},按 ${grid} 处理`);
       }
       const o2 = anyImplicit
@@ -655,7 +655,7 @@ function buildPlotBlock(kind, optsRaw, code, source) {
         const fitBox = Kit.fitImplicitBox(fns, { x: o2.x, y: o2.y, z: o2.z });
         if (fitBox.expanded) {
           const show = (r) => `[${Number(r[0].toFixed(3))}, ${Number(r[1].toFixed(3))}]`;
-          problems.push(`${data.source}:曲面伸出了 x/y/z 范围,有一角被切掉了。建议把范围写成 `
+          problems.push(`${source}:曲面伸出了 x/y/z 范围,有一角被切掉了。建议把范围写成 `
             + `x=${show(fitBox.x)} y=${show(fitBox.y)} z=${show(fitBox.z)}`
             + `(这次先自动撑到这么大)`);
           o2.x = fitBox.x;
@@ -693,11 +693,11 @@ function buildPlotBlock(kind, optsRaw, code, source) {
       // 有线段/面片时就不是"只写约束画区域"了,别再顺手把区域填上
       const regionOnly = !hasCurves && !hasShape && globalConds.length > 0;
       if (!hasCurves && !globalConds.length && !points.length && !hasShape) {
-        problems.push(`${data.source}:一个 plot2d 代码块里没有可画的式子`);
-        return whole;
+        problems.push(`${source}:一个 plot2d 代码块里没有可画的式子`);
+        return null;
       }
       if (curves.length > 6) {
-        problems.push(`${data.source}:2D 最多 6 条曲线/方程,超出的被忽略了`);
+        problems.push(`${source}:2D 最多 6 条曲线/方程,超出的被忽略了`);
       }
       const kept = curves.slice(0, 6);
       const hasImplicit = kept.some((it) => it.type === 'implicit');

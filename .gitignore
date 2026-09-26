@@ -27,4 +27,7 @@ source/files/*
 Thumbs.db
 *.swp
 
+# ---- VSCode 插件打包产物(用 npm run vscode:package 现场生成,不用进仓库) ----
+vscode-plot-preview/*.vsix
+
 # 注意:令牌只从环境变量读,任何情况下都不要写进 _config.yml 或其它文件
