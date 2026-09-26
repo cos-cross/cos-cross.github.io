@@ -169,6 +169,74 @@ function buildBlock(kind, payload, opts, rawSource, label, ratio) {
   ].join('\n');
 }
 
+/**
+ * 把 2D 图形实际占的范围量出来。
+ *
+ * 作者一个范围都没写时用它来自动定窗口 —— 不然默认的 [-10,10]² 会让一个小图形
+ * 只占画面一小角。显式曲线直接采样,隐式曲线用 marching squares 取线段端点,
+ * 点 / 线段 / 多边形顶点照抄,约束也照常生效(被裁掉的部分不算进范围)。
+ */
+function contentBox2D(kept, shapes, globalConds, regionOnly, xr, yr) {
+  const win = {
+    x: xr.slice(),
+    y: Array.isArray(yr) ? yr.slice() : [-10, 10],
+  };
+  let x0 = Infinity;
+  let x1 = -Infinity;
+  let y0 = Infinity;
+  let y1 = -Infinity;
+  const add = (x, y) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+    if (y < y0) y0 = y;
+    if (y > y1) y1 = y;
+  };
+
+  kept.forEach((it) => {
+    const mask = it.constraints.length
+      ? Kit.makeMask(it.constraints.map((c) => Kit.compileConstraint(c, ['x', 'y'])))
+      : null;
+    try {
+      if (it.type === 'explicit') {
+        const series = Kit.compute2D([it.expr], { x: win.x, samples: 400, mask }).series[0];
+        series.forEach((p) => add(p.x, p.y));
+      } else {
+        const segs = Kit.marchingSquares(Kit.compileImplicit(it.expr, ['x', 'y']),
+          { x: win.x, y: win.y, nx: 60, ny: 60, mask });
+        segs.forEach((sg) => { add(sg[0].x, sg[0].y); add(sg[1].x, sg[1].y); });
+      }
+    } catch { /* 单条算不出来不影响整体范围 */ }
+  });
+
+  if (regionOnly) {
+    const mask = Kit.makeMask(globalConds.map((c) => Kit.compileConstraint(c, ['x', 'y'])));
+    Kit.regionCells(mask, { x: win.x, y: win.y, nx: 60, ny: 60 })
+      .forEach((c) => { add(c[0], c[1]); add(c[0] + c[2], c[1] + c[3]); });
+  }
+
+  shapes.points.forEach((p) => add(p.x, p.y));
+  shapes.segments.forEach((s) => { add(s.a.x, s.a.y); add(s.b.x, s.b.y); });
+  shapes.polygons.forEach((pg) => pg.points.forEach((p) => add(p.x, p.y)));
+
+  if (!Number.isFinite(x0)) return null;
+  return { x0, x1, y0, y1 };
+}
+
+/** 代码围栏信息串里认得的选项名(用来给"选项写错地方了"这种错误加提示) */
+const OPTION_NAMES = new Set(['grid', 'n', 'alpha', 'opacity', 'ratio', 'equal', 'samples']);
+
+/**
+ * 有人把 `equal=1` 这类**选项**写成了代码块正文里的一行。
+ * 那句话会被当成表达式解析,报出来的"未知符号"完全看不出问题在哪,所以补一句提示。
+ */
+function optionHint(base) {
+  const m = /^([A-Za-z_]\w*)\s*=\s*\S+$/.exec(base.trim());
+  if (!m || !OPTION_NAMES.has(m[1].toLowerCase())) return '';
+  return `\n      ↑「${m[1]}」是选项,要写在代码围栏的**信息串**里,`
+    + `比如 \`\`\`plot2d x=[-4,4] y=[-1.5,1.5] ${m[1]}=1\`,而不是写成正文的一行`;
+}
+
 /* ---------- 过滤器 ---------- */
 
 hexo.extend.filter.register('after_post_render', function (data) {
@@ -355,7 +423,7 @@ hexo.extend.filter.register('after_post_render', function (data) {
             Kit.compileImplicit(base, kind === '3d' ? vars : ['x', 'y']);
             items.push({ type: 'implicit', expr: base, constraints: conds });
           } catch (e) {
-            problems.push(`${data.source}:"${line}" —— ${e.message}`);
+            problems.push(`${data.source}:"${line}" —— ${e.message}${optionHint(base)}`);
           }
         }
       } else {
@@ -509,6 +577,11 @@ hexo.extend.filter.register('after_post_render', function (data) {
     const askedRatio = Number.isFinite(o.ratio) ? Math.max(0.4, Math.min(1.4, o.ratio)) : null;
     if (askedRatio !== null) ratio = askedRatio;
 
+    // equal=1:强制 x、y 两个轴等长(圆不会被压成椭圆、半径长度在两个方向一致)。
+    // 隐式和区域图本来就必须等比例,写了 equal=0 可以关掉。
+    let askedEqual = null;
+    if (Number.isFinite(o.equal)) askedEqual = o.equal !== 0;
+
     if (kind === '3d') {
       if (!curves.length && !points.length && !hasShape) {
         problems.push(`${data.source}:一个 plot3d 代码块里没有可画的式子`);
@@ -611,17 +684,57 @@ hexo.extend.filter.register('after_post_render', function (data) {
       const kept = curves.slice(0, 6);
       const hasImplicit = kept.some((it) => it.type === 'implicit');
 
+      const autoX = !Array.isArray(o.x);
+      const autoY = !Array.isArray(o.y);
       const xr = normalizeRange(o.x, [-10, 10]);
       let yr = Array.isArray(o.y) ? normalizeRange(o.y, [-1, 1]) : null;
-      if ((hasImplicit || regionOnly) && !yr) {
-        // 隐式曲线和区域(圆、椭圆…)必须横纵等比例,否则会被压扁
+      const mustBeSquare = hasImplicit || regionOnly;
+
+      if (autoX && autoY) {
+        // 两个范围都没写:按图形实际占的地方自动取景。
+        // 不这么做的话窗口是默认的 [-10,10]²,一个小图形只占画面 1/20 宽 ——
+        // 就是"初始状态看着特别小"的原因。
+        const box = contentBox2D(kept, { polygons, segments, points }, globalConds, regionOnly, xr, yr);
+        if (box) {
+          const pad = 0.08;
+          const w = Math.max(box.x1 - box.x0, 1e-6);
+          const h = Math.max(box.y1 - box.y0, 1e-6);
+          const cx = (box.x0 + box.x1) / 2;
+          const cy = (box.y0 + box.y1) / 2;
+          if (mustBeSquare) {
+            // 圆和区域必须横纵等比例,所以取两个方向的较大值当边长
+            const span = Math.max(w, h) * (1 + 2 * pad);
+            xr[0] = cx - span / 2;
+            xr[1] = cx + span / 2;
+            yr = [cy - span / 2, cy + span / 2];
+          } else {
+            xr[0] = box.x0 - w * pad;
+            xr[1] = box.x1 + w * pad;
+            yr = [box.y0 - h * pad, box.y1 + h * pad];
+          }
+        }
+      } else if (mustBeSquare && !yr) {
+        // 老规矩:x 写了、y 没写 → y 取和 x 一样的跨度,中心跟着 x 的中心。
+        // 这样圆不会被压成椭圆。
         const cxr = (xr[0] + xr[1]) / 2;
         const half = (xr[1] - xr[0]) / 2;
         yr = [cxr - half, cxr + half];
       }
+
+      // equal=1:强制 x、y 两个轴等长(圆在任何比例下都不会被压扁、半径在两个方向一样长)。
+      if (askedEqual === true && yr) {
+        const span = Math.max(xr[1] - xr[0], yr[1] - yr[0]);
+        const cx = (xr[0] + xr[1]) / 2;
+        const cy = (yr[0] + yr[1]) / 2;
+        xr[0] = cx - span / 2;
+        xr[1] = cx + span / 2;
+        yr = [cy - span / 2, cy + span / 2];
+        if (askedRatio === null) ratio = 1;
+      }
+
       // 隐式曲线和区域(圆、椭圆…)必须横纵等比例,否则会被压扁。
       // 作者显式写了 ratio= 的话就尊重他(他自己知道会变形)。
-      if ((hasImplicit || regionOnly) && askedRatio === null) ratio = 1;
+      if (mustBeSquare && askedRatio === null) ratio = 1;
 
       payload = {
         items: kept.concat(polygons, segments, points),

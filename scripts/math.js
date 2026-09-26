@@ -10,13 +10,18 @@
  * 渲染后的标记里带 class="katex",主题的 head.ejs 就靠这个判断要不要引入 KaTeX 的 CSS,
  * 所以不需要任何开关。
  *
- * ⚠️ 必须挂在 after_post_render(拿到最终 HTML),不能在 before_post_render ——
- *    那个阶段代码块还是 <hexoPostRenderCodeBlock> 占位符,结构完全不同。
+ * ⚠️ 分两阶段,而且**公式必须在 Markdown 之前抽出来**(见 tools/math-scan.cjs 的说明):
+ *   before_post_render  从原始 Markdown 里把 $...$ / $$...$$ 换成自包含占位 span
+ *   after_post_render   把占位 span 换成 KaTeX 的 HTML,并兜底处理漏网的公式
+ *
+ *   只在 after_post_render 做是不行的:那时 marked 已经把 `\\` 吃成 `\`、
+ *   把公式里的换行变成 `<br>` 了,多行公式 / aligned / array 全渲染不出来。
  */
 const katex = require('katex');
+const { extractMath, decodeTex, PLACEHOLDER_RE } = require('../tools/math-scan.cjs');
 
 /**
- * 需要原样保护、绝不参与公式解析的片段。
+ * after_post_render 兜底时,需要原样保护、绝不参与公式解析的片段。
  * figure.highlight 必须排在 <pre> 前面 —— 它内部有多层 <pre>,
  * 用非贪婪的 <pre>...</pre> 会只吃掉第一层,把代码正文漏出来参与解析。
  */
@@ -24,11 +29,12 @@ const PROTECT_RE = /(<figure class="highlight[\s\S]*?<\/figure>|<pre\b[\s\S]*?<\
 
 let rendered = 0;
 let failed = 0;
+let extracted = 0;
 
 /**
  * 还原 HTML 实体。
- * 必须做:Hexo 渲染 Markdown 时会把 `=` 编码成 `&#x3D;`,于是 KaTeX 收到的是
- * `F(n) &#x3D; F(n-1)`,直接报 `Expected 'EOF', got '&'`。
+ * 兜底那条路上,Hexo 会把 `=` 编码成 `&#x3D;`,于是 KaTeX 收到
+ * `F(n) &#x3D; F(n-1)` 直接报 `Expected 'EOF', got '&'`。
  * `&amp;` 一定要最后解,否则 `&amp;lt;` 会被解成 `<` 而不是 `&lt;`。
  */
 function decodeEntities(s) {
@@ -43,7 +49,11 @@ function decodeEntities(s) {
 }
 
 function render(tex, displayMode) {
-  const source = decodeEntities(tex).trim();
+  let source = String(tex);
+  // 兜底路径上可能残留 Markdown 塞进来的 <br>(正常路径不会走到)
+  if (source.indexOf('<br') !== -1) source = source.replace(/\\?\s*<br\s*\/?>/gi, '\\\\');
+  source = decodeEntities(source).replace(/\\\\\s*$/, '').trim();
+
   try {
     const html = katex.renderToString(source, {
       displayMode,
@@ -63,35 +73,56 @@ function render(tex, displayMode) {
   }
 }
 
-hexo.extend.filter.register('after_post_render', function (data) {
-  if (!data.content || data.content.indexOf('$') === -1) return data;
+/* ---------- 一、Markdown 之前:把公式换成占位符 ---------- */
 
-  // 1. 把不该解析的片段挖出来换成占位符
+hexo.extend.filter.register('before_post_render', function (data) {
+  if (!data.content || data.content.indexOf('$') === -1) return data;
+  const got = extractMath(data.content);
+  if (!got.count) return data;
+  extracted += got.count;
+  data.content = got.text;
+  return data;
+});
+
+/* ---------- 二、Markdown 之后:把占位符换成真的公式 ---------- */
+
+hexo.extend.filter.register('after_post_render', function (data) {
+  if (!data.content || data.content.indexOf('$') === -1
+    && data.content.indexOf('dsh-math') === -1) return data;
+
+  const phRe = new RegExp(PLACEHOLDER_RE, 'g');
+
+  // 1) 独占一段的块级公式:把外层的 <p> 一起去掉,
+  //    免得块级元素套在段落里被压出一堆多余的行距。
+  data.content = data.content.replace(
+    new RegExp(`<p>\\s*${PLACEHOLDER_RE.replace('data-display="([01])"', 'data-display="1"')}\\s*</p>`, 'g'),
+    (m, tex) => render(decodeTex(tex), true),
+  );
+
+  // 2) 其余占位符(行内、以及夹在文字中间的块级)
+  data.content = data.content.replace(phRe, (m, tex, disp) => render(decodeTex(tex), disp === '1'));
+
+  // 3) 兜底:还有漏网的 $...$ 就按老规矩处理
+  if (data.content.indexOf('$') === -1) return data;
+
   const store = [];
   let html = data.content.replace(PROTECT_RE, (m) => {
     store.push(m);
     return `\u0000P${store.length - 1}\u0000`;
   });
 
-  // 2. 独占一段的块级公式:把外层 <p> 一起去掉,免得块级元素套在段落里
   html = html.replace(/<p>\s*\$\$([\s\S]+?)\$\$\s*<\/p>/g, (m, tex) => render(tex, true));
-
-  // 3. 其余块级公式
   html = html.replace(/\$\$([\s\S]+?)\$\$/g, (m, tex) => render(tex, true));
-
-  // 4. 行内公式。要求 $ 紧跟非空白、且 $ 前面也不是空白,
-  //    这样 "花了 $5 到 $10" 这种不会被误判成公式。
   html = html.replace(/\$([^\s$][^$\n]*?[^\s$]|[^\s$])\$/g, (m, tex) => render(tex, false));
 
-  // 5. 还原被保护的片段
   data.content = html.replace(/\u0000P(\d+)\u0000/g, (m, i) => store[Number(i)]);
-
   return data;
 });
 
 hexo.extend.filter.register('after_generate', function () {
-  if (rendered || failed) {
-    hexo.log.info('math: 渲染 %d 条公式%s', rendered, failed ? `,${failed} 条有语法错误` : '');
+  if (extracted || rendered || failed) {
+    hexo.log.info('math: 抽取 %d 条,渲染 %d 条%s',
+      extracted, rendered, failed ? `,${failed} 条有语法错误` : '');
   }
 });
 

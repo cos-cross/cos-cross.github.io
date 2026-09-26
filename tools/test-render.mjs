@@ -575,9 +575,11 @@ console.log('\n=== 构建产物里的真实载荷(端到端) ===');
     let slit = 0;
     let linkChecked = 0;
     let badLinks = 0;
+    let outOfWindow = 0;
     const clippedNames = [];
     const slitNames = [];
     const badLinkNames = [];
+    const outOfWindowNames = [];
     const kinds = new Set();
     for (const page of pages) {
       const html = fs.readFileSync(page, 'utf8');
@@ -594,6 +596,31 @@ console.log('\n=== 构建产物里的真实载荷(端到端) ===');
         if (drawn === 0) empty += 1;
 
         // 3D:真实载荷也必须"打开就完整可见"。画布宽 800,高按 data-ratio 或 3D 默认 0.78。
+        if (kind === '2d') {
+          // 2D 的"窗口"就是坐标系本身,所以"画出来的东西全在画布内"等价于
+          // "自动取景的窗口真的装下了图形" —— 这正是之前那个默认 [-10,10]²
+          // 让一个小图形缩成一点点的问题。
+          const W = r.canvas.width;
+          const H = r.canvas.height;
+          const xs = [];
+          const ys = [];
+          r.record.shapes.forEach((sh) => {
+            sh.path.forEach((e) => {
+              if (e[0] === 'r') { xs.push(e[1], e[1] + e[3]); ys.push(e[2], e[2] + e[4]); }
+              else { xs.push(e[1]); ys.push(e[2]); }
+            });
+          });
+          if (xs.length) {
+            const over = Math.max(0,
+              Math.max(...xs) - W, -Math.min(...xs),
+              Math.max(...ys) - H, -Math.min(...ys));
+            if (over > 3) {
+              outOfWindow += 1;
+              outOfWindowNames.push(`x=[${payload.opts.x.map((v) => v.toFixed(2))}] 超出 ${over.toFixed(0)}px`);
+            }
+          }
+        }
+
         if (kind === '3d') {
           const W = r.canvas.width;
           const H = r.canvas.height;
@@ -676,6 +703,8 @@ console.log('\n=== 构建产物里的真实载荷(端到端) ===');
       `${slit} 张被切:${slitNames.slice(0, 3).join('; ')}`);
     ok('辅助线段全都正好连起两个相切的球心', badLinks === 0,
       `${linkChecked} 张晶胞图里 ${badLinks} 张有问题:${badLinkNames.join('; ')}`);
+    ok('2D 的窗口都装得下画出来的图形', outOfWindow === 0,
+      `${outOfWindow} 张越界:${outOfWindowNames.slice(0, 3).join('; ')}`);
     console.log(`       跑了 ${total} 张图,图元类型:${[...kinds].join(' / ')}`);
   }
 }
