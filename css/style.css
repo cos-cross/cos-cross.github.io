@@ -1765,17 +1765,19 @@ p { margin: 0; }
 }
 .footer-col a:hover { color: var(--cyan); transform: translateX(3px); }
 
-/* shields.io 徽章:图片自带配色和内边距,所以链接不要收回调色 ——
-   改成"平时压一点亮度、悬停提亮",这样深浅色主题下都不会跑偏 */
+/* shields.io 徽章(关于页 Find Me、项目页那行这类正文里的位置):
+   图片自带配色和内边距,所以不要给它加边框;高度统一到 20px,和 13px 的行高对齐 */
 .social-badge {
-  display: block;
+  display: inline-block;
   height: 20px;
   width: auto;
-  opacity: .88;
+  vertical-align: middle;
+  opacity: .9;
   transition: opacity .2s var(--ease);
 }
 a:hover > .social-badge, a:focus-visible > .social-badge { opacity: 1; }
-/* 正文里内联的徽章(比如项目页那行):图片默认贴着基线,和文字对不齐 */
+/* 用 Markdown 直接写的徽章(![](https://img.shields.io/...))没有 class,
+   按域名兜一下基线对齐 */
 .page-content img[src*="img.shields.io"] { vertical-align: middle; }
 
 .footer-bottom {
@@ -1914,11 +1916,11 @@ a:hover > .social-badge, a:focus-visible > .social-badge { opacity: 1; }
     border-top: 1px solid var(--line);
   }
   .nav-social {
-    /* 里面是 shields.io 徽章图片(自带边框和配色),所以不要再套一层文字药丸的
-       padding / border,否则徽章外面会多出一圈框 */
-    display: inline-flex;
-    align-items: center;
-    line-height: 0;
+    padding: 6px 12px;
+    border-radius: 99px;
+    border: 1px solid var(--line);
+    font: 500 12.5px/1.6 var(--mono);
+    color: var(--text-2);
   }
 
   .brand-text em { display: none; }
