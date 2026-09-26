@@ -10,6 +10,7 @@
  *   npm run deploy                         # 提交源码 + 构建 + 发布
  *   npm run deploy -- -m "写了新文章"        # 自定义提交信息
  *   npm run deploy -- --no-source          # 只发站点,不动源码提交
+ *   npm run deploy -- --no-push            # 只提交不推送(本地演练)
  *   GITHUB_TOKEN=ghp_xxx npm run deploy    # 用令牌认证(CI / 沙箱)
  *   BLOG_REPO=https://github.com/u/r.git npm run deploy
  *
@@ -17,6 +18,11 @@
  *   1. 不用 hexo-deployer-git —— 它要求把仓库地址(可能带令牌)写进 _config.yml;
  *   2. 需要读 git 输出的地方,一律把输出重定向到文件而不是管道 ——
  *      受限沙箱里命名管道会被拦,重定向到文件两种环境都能跑。
+ *
+ * 幂等性:同一个版本连着跑两次不能报错。产物没变时第二步会**没有东西可提交**,
+ * 而 `git commit` 在干净的工作区上是以 1 退出的 —— 直接调就会把"没事可做"
+ * 报成失败。所以提交前先看 status,没变化就跳过提交,但**照常推送** ——
+ * 这样"上次 push 卡在网络/权限上"的仓库,再跑一次就能补推上去。
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -30,6 +36,7 @@ const BRANCH = 'gh-pages';
 
 const argv = process.argv.slice(2);
 const skipSource = argv.includes('--no-source');
+const skipPush = argv.includes('--no-push');
 const msgIndex = argv.findIndex((a) => a === '-m' || a === '--message');
 const customMessage = msgIndex >= 0 ? argv[msgIndex + 1] : null;
 
@@ -134,11 +141,31 @@ writeFileSync(path.join(publicDir, '.gitattributes'), '* -text\n');
 console.log(`\n[2/2] 发布站点到 ${BRANCH} 分支 …`);
 const gitPub = (args, extra = []) => gitRun(args, extra, publicDir);
 
-gitPub(['init', '-q', '-b', BRANCH]);
+// 只在还不是仓库时才 init —— 已存在时再 init 会打一句
+// "re-init: ignored --initial-branch=gh-pages" 的无害警告,容易被当成出错。
+if (!existsSync(path.join(publicDir, '.git'))) {
+  gitPub(['init', '-q', '-b', BRANCH]);
+}
 gitPub(['add', '-A']);
-gitPub([...AUTHOR, 'commit', '-q', '-m', `deploy: ${stamp}`]);
-// 注意:-c 是 git 的全局选项,必须排在 push 子命令之前
-gitPub(['push', '-q', '-f', repo, `${BRANCH}:${BRANCH}`], authArgs);
+
+// 工作区没变化就别 commit:干净的时候 `git commit` 会以 1 退出,
+// 于是"连着部署同一个版本"会被报成失败 —— 其实什么都没坏。
+const pubStatus = gitOut(['status', '--porcelain'], publicDir);
+if (pubStatus.status !== 0) {
+  console.warn('  ⚠️  读取 public 的 git status 失败,跳过产物提交,直接推送已有提交。');
+} else if (!pubStatus.out.trim()) {
+  console.log('  产物没有变化,跳过提交(仍然会推送一次,把上次没推成功的补上)。');
+} else {
+  gitPub([...AUTHOR, 'commit', '-q', '-m', `deploy: ${stamp}`]);
+  console.log('  ✓ 已提交产物');
+}
+
+if (skipPush) {
+  console.log('  (--no-push:跳过推送)');
+} else {
+  // 注意:-c 是 git 的全局选项,必须排在 push 子命令之前
+  gitPub(['push', '-q', '-f', repo, `${BRANCH}:${BRANCH}`], authArgs);
+}
 
 console.log(`\n✓ 完成(${stamp})`);
 console.log('  GitHub Pages 还要构建 20~60 秒才会生效,然后可以跑 npm run verify 确认。');
