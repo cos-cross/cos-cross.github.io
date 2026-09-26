@@ -479,11 +479,36 @@
      三、3D:高度场网格
      ============================================================ */
 
+  /**
+   * 网格密度的上下限 —— **渲染器和构建期插件共用这一份**。
+   *
+   * 以前两边各写一套(插件说隐式最多 80、渲染器偷偷夹到 64),
+   * 于是 `grid=80` 静默地给出 64 的结果,作者完全看不出来。
+   * 现在只有一个真值来源,构建期还会在"你要的比上限高"时直接报警告。
+   *
+   * 上限不是拍脑袋定的:
+   *   - 隐式(surface nets)要采样 (n+1)³ 个点,内存和时间都随 n³ 涨;
+   *     n=96 时单个曲面约 90 万次求值 / 7 MB 临时数组,4 个曲面 ~0.4 秒,还是能忍的;
+   *   - 显式(高度场)只要 (n+1)² 次求值,但四边形数正好是 n²,
+   *     而每帧都要排序 + 逐个 fill,所以真正的瓶颈是**拖动时的帧率**而不是求值。
+   */
+  var GRID_LIMITS = {
+    implicit: { min: 8, max: 96, def: 32 },
+    explicit: { min: 4, max: 120, def: 46 },
+  };
+
+  /** 把作者写的 grid 夹进合法区间 */
+  function clampGrid(asked, kind) {
+    var L = GRID_LIMITS[kind];
+    var want = Number.isFinite(asked) ? Math.round(asked) : L.def;
+    return Math.max(L.min, Math.min(L.max, want));
+  }
+
   function buildSurface(expr, opts) {
     opts = opts || {};
     var fn = compile(expr, ['x', 'y']);
     var scope = makeScope(['x', 'y', 'z']);
-    var n = Math.max(4, Math.min(120, opts.grid || 44));
+    var n = clampGrid(opts.grid, 'explicit');
     var x0 = opts.x[0], x1 = opts.x[1], y0 = opts.y[0], y1 = opts.y[1];
     var mask = opts.mask || null;
 
@@ -657,7 +682,7 @@
    * 把范围开大一点就能避免。
    */
   function surfaceNets(fn, opts) {
-    const n = Math.max(8, Math.min(64, opts.grid || 26));
+    const n = clampGrid(opts.grid, 'implicit');
     const x0 = opts.x[0], x1 = opts.x[1];
     const y0 = opts.y[0], y1 = opts.y[1];
     const z0 = opts.z[0], z1 = opts.z[1];
@@ -1989,6 +2014,8 @@
     rotatePoint: rotatePoint,
     colormap: colormap,
     niceStep: niceStep,
+    GRID_LIMITS: GRID_LIMITS,
+    clampGrid: clampGrid,
     inflateQuad: inflateQuad,
     mount: mount,
     boot: boot,
