@@ -34,7 +34,7 @@ check('页面里有图像容器', blocks.length > 10, `${blocks.length} 个`);
 check('2D 与 3D 都有', blocks.some((b) => b[1] === '2d') && blocks.some((b) => b[1] === '3d'));
 check('每个容器都有 canvas',
   (page.match(/<div class="plot-stage"><canvas><\/canvas><\/div>/g) || []).length === blocks.length);
-check('引入了带版本号的 plot.js', /js\/plot\.js\?v=\d+/.test(page));
+check('引入了带内容指纹版本号的 plot.js', /js\/plot\.js\?v=[0-9a-f]{6,}/.test(page));
 
 const jsRes = await fetch(BASE + '/js/plot.js', { headers: { 'User-Agent': 'v' } });
 check('plot.js 线上可达', jsRes.status === 200, `HTTP ${jsRes.status}`);

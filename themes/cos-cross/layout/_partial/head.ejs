@@ -49,8 +49,10 @@
   <link rel="apple-touch-icon" sizes="180x180" href="<%= url_for(theme.profile.appleTouchIcon) %>">
   <% } %>
   <link rel="alternate" type="application/atom+xml" title="<%= config.title %>" href="<%= url_for('/atom.xml') %>">
-  <link rel="stylesheet" href="<%= url_for('/css/style.css') %>">
+  <!-- 样式表挂 ?v=<内容指纹>:GitHub Pages 的 CSS 缓存是 10 分钟,
+       不带版本号的话改了样式、HTML 更新了、浏览器还在用旧 CSS(见 tools/asset-version.cjs) -->
+  <link rel="stylesheet" href="<%= url_for('/css/style.css') %><%= asset_v('/css/style.css') %>">
   <% if (needMath) { %>
-  <link rel="stylesheet" href="<%= url_for('/vendor/katex/katex.min.css') %>">
+  <link rel="stylesheet" href="<%= url_for('/vendor/katex/katex.min.css') %><%= asset_v('/vendor/katex/katex.min.css') %>">
   <% } %>
 </head>

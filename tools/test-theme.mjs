@@ -92,5 +92,27 @@ console.log('\n=== {% social_badge %} 的取名与标记 ===');
     badgeHtml({ name: 'a"b', link: 'https://x.com/?a=1&b=2' }));
 }
 
+console.log('\n=== 静态资源的缓存指纹(asset_v)===');
+{
+  const { shortHash, versionQuery } = require(path.join(root, 'tools', 'asset-version.cjs'));
+
+  ok('指纹是 8 位十六进制', /^[0-9a-f]{8}$/.test(shortHash('body{}')), shortHash('body{}'));
+  ok('同样内容指纹稳定', shortHash('a{}') === shortHash('a{}'));
+  ok('内容一变指纹就变', shortHash('a{}') !== shortHash('a{color:red}'));
+  ok('空内容也不炸', /^[0-9a-f]{8}$/.test(shortHash('')) && /^[0-9a-f]{8}$/.test(shortHash(null)));
+  ok('中文内容也算得出来', /^[0-9a-f]{8}$/.test(shortHash('/* 中文注释 */')));
+
+  ok('查询串形状正确', versionQuery('3fa91c07') === '?v=3fa91c07', versionQuery('3fa91c07'));
+  ok('指纹不可用时返回空串(页面照常工作)', versionQuery('') === '' && versionQuery(undefined) === '');
+  ok('长度不对的指纹不收', versionQuery('abc') === '', versionQuery('abc'));
+  ok('非十六进制不收', versionQuery('zzzzzzzz') === '', versionQuery('zzzzzzzz'));
+
+  // 端到端:模板里是 url_for(...) + asset_v(...) 拼起来的
+  const url = '/css/style.css' + versionQuery(shortHash('.social-badge{display:inline-block}'));
+  ok('拼出来的链接长这样', /^\/css\/style\.css\?v=[0-9a-f]{8}$/.test(url), url);
+  // check.mjs 得能剥掉查询串再校验文件存在,否则会误报
+  ok('查询串能被剥掉', url.split('#')[0].split('?')[0] === '/css/style.css');
+}
+
 console.log(`\n${pass} 通过,${fail} 失败`);
 process.exit(fail ? 1 : 0);

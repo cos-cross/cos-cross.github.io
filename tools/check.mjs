@@ -63,12 +63,15 @@ for (const file of files) {
   const base = path.dirname(rel);
   const refs = [...html.matchAll(/(?:href|src)\s*=\s*"([^"]+)"/g)].map((m) => m[1]);
 
-  for (const ref of refs) {
+  for (const rawRef of refs) {
+    // 静态资源链接会带 ?v=<内容指纹> 这样的缓存版本号(见 tools/asset-version.cjs),
+    // 校验"文件在不在"之前必须先把查询串和锚点去掉,否则会被当成本地文件找不着
+    const ref = rawRef.split('#')[0].split('?')[0];
     if (!ref || /^(https?:|mailto:|tel:|data:|javascript:|#|\/\/)/.test(ref)) continue;
     stats.links++;
     const target = ref.startsWith('/') ? ref : path.relative(publicDir, path.join(base, ref)).replace(/\\/g, '/');
     const found = candidates(target).some((c) => fileSet.has(c) || existsSync(c));
-    if (!found) problems.push(`${path.relative(publicDir, file)}: 链接目标不存在 -> ${ref}`);
+    if (!found) problems.push(`${path.relative(publicDir, file)}: 链接目标不存在 -> ${rawRef}`);
   }
 
   for (const asset of ['/css/style.css', '/js/main.js', '/img/avatar.svg', '/img/favicon.svg']) {
