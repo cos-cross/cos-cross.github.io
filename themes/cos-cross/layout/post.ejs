@@ -1,9 +1,15 @@
 <%
-  var plain = strip_html(page.content || '').replace(/\s+/g, '');
+  // 先过 readable_html:去掉 KaTeX 的隐藏 MathML 层、plot 的内联 JSON 数据和零宽字符。
+  // 不过的话阅读时长会被这些东西撑到几倍(见 tools/readable-html.cjs)
+  var plain = strip_html(readable_html(page.content || '')).replace(/\s+/g, '');
   var readMin = Math.max(1, Math.ceil(plain.length / 350));
   var cats = (page.categories && page.categories.length) ? page.categories.toArray() : [];
   var tags = (page.tags && page.tags.length) ? page.tags.toArray() : [];
-  var tocHtml = theme.post.toc ? toc(page.content, { list_number: false, max_depth: 3 }) : '';
+  // 目录里的标题必须是纯文字。直接喂 page.content 的话,标题里的公式会把
+  // KaTeX 的隐藏 MathML 层和可见层一起串进目录(`$D_3$` → `D3D_3D3`),
+  // 所以先剥掉隐藏层再交给 toc()。
+  // max_depth 5:笔记里章节会往下写到 ##### ,3 的话这些标题全被挡在目录外。
+  var tocHtml = theme.post.toc ? toc(readable_html(page.content), { list_number: false, max_depth: 5 }) : '';
   var hasToc = !!(tocHtml && String(tocHtml).trim());
   var updatedDiff = page.updated && (page.updated.valueOf() - page.date.valueOf() > 60000);
 %>

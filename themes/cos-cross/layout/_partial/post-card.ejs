@@ -1,9 +1,11 @@
 <%
-  var plain = strip_html(post.content || '').replace(/\s+/g, '');
+  // readable_html:见 tools/readable-html.cjs —— 不加的话公式的隐藏层和 plot 的
+  // 内联 JSON 都会被当正文,阅读时长虚高、摘要还可能从头开始就是 JSON
+  var plain = strip_html(readable_html(post.content || '')).replace(/\s+/g, '');
   var readMin = Math.max(1, Math.ceil(plain.length / 350));
   var excerptText = post.excerpt
-    ? truncate(strip_html(post.excerpt), { length: 96 })
-    : truncate(strip_html(post.content || ''), { length: 96 });
+    ? truncate(strip_html(readable_html(post.excerpt)), { length: 96 })
+    : truncate(strip_html(readable_html(post.content || '')), { length: 96 });
   var postCats = post.categories && post.categories.length ? post.categories.toArray() : [];
   var postTags = post.tags && post.tags.length ? post.tags.toArray() : [];
   var fallbackCat = (theme.text && theme.text.default_category) || '随笔';

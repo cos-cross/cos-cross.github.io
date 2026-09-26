@@ -129,5 +129,51 @@ console.log('\n=== 占位符本身 ===');
   ok('decodeTex 能还原中文和反斜杠', decodeTex(Buffer.from('\\cfrac{π}{6}', 'utf8').toString('base64')) === '\\cfrac{π}{6}');
 }
 
+console.log('\n=== 标题里的公式进目录(读到的不是 KaTeX 的隐藏层) ===');
+{
+  const katex = require('katex');
+  const { tocObj } = require('hexo-util');
+  const { readableHtml, stripHiddenMath } = require(path.join(root, 'tools', 'readable-html.cjs'));
+
+  // 标题:$D_3$、$D_4$区:完整算一遍  —— 真实场景里 KaTeX 构建期就会渲染成这样
+  const math = (tex) => katex.renderToString(tex, { displayMode: false, throwOnError: false });
+  const heading = `<h3 id="区-完整算一遍">${math('D_3')}、${math('D_4')}区:完整算一遍</h3>`;
+
+  const before = tocObj(heading)[0].text;
+  ok('先说清楚 bug 长什么样:两层文字被串在一起',
+    before.includes('D3D_3D3'), before);
+  ok('bug 里连零宽空格都在', /\u200b/.test(before));
+
+  const after = tocObj(readableHtml(heading))[0];
+  ok('修完只剩可见字形', after.text === 'D3、D4区:完整算一遍', JSON.stringify(after.text));
+  ok('没有零宽字符残留', !/\u200b/.test(after.text));
+  ok('锚点 id 没被动过', after.id === '区-完整算一遍', after.id);
+  ok('层级也没变', after.level === 3, String(after.level));
+
+  // 普通标题不受影响
+  const plain = `<h2 id="x">普通 标题 <code>code</code></h2>`;
+  ok('没有公式的标题原样通过', readableHtml(plain) === plain);
+
+  // 隐藏层剥掉后,可见层的字符数应该守恒(只少了隐藏的那部分)
+  ok('隐藏层被整段删掉', stripHiddenMath(heading).indexOf('katex-mathml') === -1);
+  ok('可见层还在', stripHiddenMath(heading).indexOf('katex-html') !== -1);
+  ok('标签仍然配平', (() => {
+    const s = stripHiddenMath(heading);
+    const open = (s.match(/<span\b/g) || []).length;
+    const close = (s.match(/<\/span>/g) || []).length;
+    return open === close;
+  })());
+
+  // 脚本/样式正文不算阅读内容(plot 的 JSON 数据就是这么被数进去的)
+  const withScript = '<p>正文</p><script type="application/json">{"items":[1,2,3]}</script>'
+    + '<style>.a{color:red}</style>';
+  ok('内联 script / style 正文被去掉',
+    readableHtml(withScript) === '<p>正文</p>', readableHtml(withScript));
+
+  // 结构异常时宁可不清,也不能吃掉后面的正文
+  const broken = '<p>a</p><span class="katex-mathml"><math>x</math><p>b</p>';
+  ok('隐藏层不配平时不动原文', readableHtml(broken) === broken, readableHtml(broken));
+}
+
 console.log(`\n${pass} 通过,${fail} 失败`);
 process.exit(fail ? 1 : 0);

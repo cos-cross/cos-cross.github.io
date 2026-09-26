@@ -17,7 +17,7 @@
     pageTitle = config.title;
   }
   var rawDesc = page.excerpt ? page.excerpt : (page.description || (is_home() ? config.description : ''));
-  var pageDesc = rawDesc ? truncate(strip_html(rawDesc), { length: 140 }) : (config.description || '');
+  var pageDesc = rawDesc ? truncate(strip_html(readable_html(rawDesc)), { length: 140 }) : (config.description || '');
   var canonical = full_url_for(page.path || '/');
   var avatarUrl = full_url_for(theme.profile.avatar);
   var favicon = theme.profile.favicon || '/img/favicon.svg';

@@ -1116,6 +1116,14 @@ p { margin: 0; }
   background: linear-gradient(90deg, rgba(46, 230, 255, .12), transparent);
 }
 .toc-card .toc-child { padding-left: 10px; }
+/* 目录收到 5 级(post.ejs 的 max_depth)。栏宽只有 220px,
+   每级再各缩进 10px、字号一样大的话,第 4、5 级会被挤成一条缝 ——
+   所以第三级往下缩进收窄,深的标题字号收一号、颜色退一档。 */
+.toc-card .toc-child .toc-child { padding-left: 7px; }
+.toc-card .toc-level-4 { font-size: 12.5px; }
+.toc-card .toc-level-5 { font-size: 12.5px; }
+.toc-card .toc-level-5 .toc-link { color: var(--text-3); }
+.toc-card .toc-level-5 .toc-link:hover { color: var(--text); }
 
 .toc-progress { height: 3px; margin-top: 12px; border-radius: 99px; background: var(--panel-hi); overflow: hidden; }
 .toc-progress-bar { display: block; height: 100%; width: 0; background: var(--grad-main); transition: width .15s linear; }

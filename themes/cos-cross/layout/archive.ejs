@@ -35,7 +35,7 @@
   <% posts.forEach(function (post) { %>
     <%
       var year = date(post.date, 'YYYY');
-      var plain = strip_html(post.content || '').replace(/\s+/g, '');
+      var plain = strip_html(readable_html(post.content || '')).replace(/\s+/g, '');
       var readMin = Math.max(1, Math.ceil(plain.length / 350));
       var cats = (post.categories && post.categories.length) ? post.categories.toArray() : [];
     %>
