@@ -150,12 +150,12 @@
       
       <span class="meta-item">
 <svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm1 3v5.6l3.7 2.1-1 1.7L11 13.7V7z" fill="currentColor"/></svg>
-约 29 分钟</span>
+约 31 分钟</span>
       
       
       <span class="meta-item meta-updated">
 <svg class="ico " viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z" fill="currentColor"/></svg>
-更新于 2026-09-26</span>
+更新于 2026-10-05</span>
       
       
       <span class="meta-item">
@@ -184,7 +184,7 @@
     <aside class="post-toc" id="post-toc" aria-label="目录">
       <div class="toc-card">
         <div class="toc-title"><span class="toc-bar"></span>目录</div>
-        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%88%E7%9C%8B%E6%95%88%E6%9E%9C"><span class="toc-text">先看效果</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E7%94%A8%E7%8E%B0%E6%88%90%E7%9A%84%E5%BA%93"><span class="toc-text">为什么不用现成的库</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%87%A0%E4%B8%AA%E5%AE%9E%E7%8E%B0%E7%BB%86%E8%8A%82"><span class="toc-text">几个实现细节</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%8E%E4%B9%88%E7%94%A8"><span class="toc-text">怎么用</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%BF%98%E6%94%AF%E6%8C%81%E9%9A%90%E5%BC%8F%E6%96%B9%E7%A8%8B"><span class="toc-text">还支持隐式方程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%90%83%E9%9D%A2%E7%9B%B4%E6%8E%A5%E5%86%99-sphere"><span class="toc-text">球面直接写 sphere</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8D%8A%E9%80%8F%E6%98%8E"><span class="toc-text">半透明</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BA%BF%E6%AE%B5%E5%92%8C%E5%A4%9A%E8%BE%B9%E5%BD%A2%E9%9D%A2"><span class="toc-text">线段和多边形面</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%A4%E7%A7%8D%E6%96%B9%E7%A8%8B%E8%83%8C%E5%90%8E%E6%98%AF%E4%B8%A4%E5%A5%97%E5%AE%8C%E5%85%A8%E4%B8%8D%E5%90%8C%E7%9A%84%E7%AE%97%E6%B3%95"><span class="toc-text">两种方程背后是两套完全不同的算法</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%80%89%E9%A1%B9%E4%B8%8A%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="toc-text">选项上的区别</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%83%B3%E8%AE%A9%E6%9B%B2%E9%9D%A2%E6%9B%B4%E7%B2%BE%E7%BB%86"><span class="toc-text">想让曲面更精细?</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2D-%E7%9A%84%E7%AA%97%E5%8F%A3-%E4%B8%8D%E5%86%99%E8%8C%83%E5%9B%B4%E5%B0%B1%E8%87%AA%E5%8A%A8%E5%8F%96%E6%99%AF"><span class="toc-text">2D 的窗口:不写范围就自动取景</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BA%A6%E6%9D%9F%E6%9D%A1%E4%BB%B6-%E6%8A%8A%E5%9B%BE%E5%BD%A2%E8%A3%81%E6%88%90%E4%BD%A0%E6%83%B3%E8%A6%81%E7%9A%84%E9%82%A3%E4%B8%80%E5%9D%97"><span class="toc-text">约束条件:把图形裁成你想要的那一块</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8F%AA%E5%86%99%E7%BA%A6%E6%9D%9F%E6%9D%A1%E4%BB%B6-%E7%94%BB%E5%8C%BA%E5%9F%9F"><span class="toc-text">只写约束条件 &#x3D; 画区域</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BA%A6%E6%9D%9F%E6%98%AF%E6%80%8E%E4%B9%88%E5%AE%9E%E7%8E%B0%E7%9A%84"><span class="toc-text">约束是怎么实现的</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8D%95%E7%8B%AC%E7%9A%84%E7%82%B9"><span class="toc-text">单独的点</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BB%99%E6%AF%8F%E6%9D%A1%E6%9B%B2%E7%BA%BF%E5%8D%95%E7%8B%AC%E5%AE%9A%E5%88%B6%E7%BA%A6%E6%9D%9F"><span class="toc-text">给每条曲线单独定制约束</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%A8%E5%B1%80%E5%92%8C%E5%B1%80%E9%83%A8%E6%98%AF%E5%8F%A0%E5%8A%A0%E7%9A%84-%E4%B8%8D%E6%98%AF%E8%A6%86%E7%9B%96"><span class="toc-text">全局和局部是叠加的,不是覆盖</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%AF%8F%E4%B8%AA%E7%82%B9%E4%B9%9F%E5%8F%AF%E4%BB%A5%E6%9C%89%E8%87%AA%E5%B7%B1%E7%9A%84%E7%BA%A6%E6%9D%9F"><span class="toc-text">每个点也可以有自己的约束</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%A4%E4%BA%92"><span class="toc-text">交互</span></a></li></ol>
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%88%E7%9C%8B%E6%95%88%E6%9E%9C"><span class="toc-text">先看效果</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E7%94%A8%E7%8E%B0%E6%88%90%E7%9A%84%E5%BA%93"><span class="toc-text">为什么不用现成的库</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%87%A0%E4%B8%AA%E5%AE%9E%E7%8E%B0%E7%BB%86%E8%8A%82"><span class="toc-text">几个实现细节</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%8E%E4%B9%88%E7%94%A8"><span class="toc-text">怎么用</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%BF%98%E6%94%AF%E6%8C%81%E9%9A%90%E5%BC%8F%E6%96%B9%E7%A8%8B"><span class="toc-text">还支持隐式方程</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%90%83%E9%9D%A2%E7%9B%B4%E6%8E%A5%E5%86%99-sphere"><span class="toc-text">球面直接写 sphere</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8D%8A%E9%80%8F%E6%98%8E"><span class="toc-text">半透明</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BA%BF%E6%AE%B5%E5%92%8C%E5%A4%9A%E8%BE%B9%E5%BD%A2%E9%9D%A2"><span class="toc-text">线段和多边形面</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%9C%89%E5%90%91%E7%BA%BF%E6%AE%B5-%E7%AE%AD%E5%A4%B4"><span class="toc-text">有向线段(箭头)</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%A4%E7%A7%8D%E6%96%B9%E7%A8%8B%E8%83%8C%E5%90%8E%E6%98%AF%E4%B8%A4%E5%A5%97%E5%AE%8C%E5%85%A8%E4%B8%8D%E5%90%8C%E7%9A%84%E7%AE%97%E6%B3%95"><span class="toc-text">两种方程背后是两套完全不同的算法</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E9%80%89%E9%A1%B9%E4%B8%8A%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="toc-text">选项上的区别</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%83%B3%E8%AE%A9%E6%9B%B2%E9%9D%A2%E6%9B%B4%E7%B2%BE%E7%BB%86"><span class="toc-text">想让曲面更精细?</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2D-%E7%9A%84%E7%AA%97%E5%8F%A3-%E4%B8%8D%E5%86%99%E8%8C%83%E5%9B%B4%E5%B0%B1%E8%87%AA%E5%8A%A8%E5%8F%96%E6%99%AF"><span class="toc-text">2D 的窗口:不写范围就自动取景</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BA%A6%E6%9D%9F%E6%9D%A1%E4%BB%B6-%E6%8A%8A%E5%9B%BE%E5%BD%A2%E8%A3%81%E6%88%90%E4%BD%A0%E6%83%B3%E8%A6%81%E7%9A%84%E9%82%A3%E4%B8%80%E5%9D%97"><span class="toc-text">约束条件:把图形裁成你想要的那一块</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%8F%AA%E5%86%99%E7%BA%A6%E6%9D%9F%E6%9D%A1%E4%BB%B6-%E7%94%BB%E5%8C%BA%E5%9F%9F"><span class="toc-text">只写约束条件 &#x3D; 画区域</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BA%A6%E6%9D%9F%E6%98%AF%E6%80%8E%E4%B9%88%E5%AE%9E%E7%8E%B0%E7%9A%84"><span class="toc-text">约束是怎么实现的</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8D%95%E7%8B%AC%E7%9A%84%E7%82%B9"><span class="toc-text">单独的点</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BB%99%E6%AF%8F%E6%9D%A1%E6%9B%B2%E7%BA%BF%E5%8D%95%E7%8B%AC%E5%AE%9A%E5%88%B6%E7%BA%A6%E6%9D%9F"><span class="toc-text">给每条曲线单独定制约束</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%A8%E5%B1%80%E5%92%8C%E5%B1%80%E9%83%A8%E6%98%AF%E5%8F%A0%E5%8A%A0%E7%9A%84-%E4%B8%8D%E6%98%AF%E8%A6%86%E7%9B%96"><span class="toc-text">全局和局部是叠加的,不是覆盖</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%AF%8F%E4%B8%AA%E7%82%B9%E4%B9%9F%E5%8F%AF%E4%BB%A5%E6%9C%89%E8%87%AA%E5%B7%B1%E7%9A%84%E7%BA%A6%E6%9D%9F"><span class="toc-text">每个点也可以有自己的约束</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%A4%E4%BA%92"><span class="toc-text">交互</span></a></li></ol>
         <div class="toc-progress"><span class="toc-progress-bar" id="toc-progress-bar"></span></div>
       </div>
     </aside>
@@ -523,7 +523,7 @@ links(2)
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2+y^2+(z-1.41421356237)^2=0.75","display":"球 · 球心 A · r = sqrt(3)/2","constraints":[]},{"type":"implicit","expr":"(x-1)^2+y^2+z^2=0.75","display":"球 · 球心 B · r = sqrt(3)/2","constraints":[]},{"type":"implicit","expr":"(x+0.5)^2+(y-0.866025403784)^2+z^2=0.75","display":"球 · 球心 C · r = sqrt(3)/2","constraints":[]},{"type":"implicit","expr":"(x+0.5)^2+(y+0.866025403784)^2+z^2=0.75","display":"球 · 球心 D · r = sqrt(3)/2","constraints":[]},{"type":"segment","a":{"x":0,"y":0,"z":1.4142135623730951},"b":{"x":1,"y":0,"z":0},"constraints":[]},{"type":"segment","a":{"x":0,"y":0,"z":1.4142135623730951},"b":{"x":-0.5,"y":0.8660254037844386,"z":0},"constraints":[]},{"type":"segment","a":{"x":0,"y":0,"z":1.4142135623730951},"b":{"x":-0.5,"y":-0.8660254037844386,"z":0},"constraints":[]},{"type":"segment","a":{"x":1,"y":0,"z":0},"b":{"x":-0.5,"y":0.8660254037844386,"z":0},"constraints":[]},{"type":"segment","a":{"x":1,"y":0,"z":0},"b":{"x":-0.5,"y":-0.8660254037844386,"z":0},"constraints":[]},{"type":"segment","a":{"x":-0.5,"y":0.8660254037844386,"z":0},"b":{"x":-0.5,"y":-0.8660254037844386,"z":0},"constraints":[]},{"type":"point","x":0,"y":0,"z":1.4142135623730951,"label":"A","constraints":[]},{"type":"point","x":1,"y":0,"z":0,"label":"B","constraints":[]},{"type":"point","x":-0.5,"y":0.8660254037844386,"z":0,"label":"C","constraints":[]},{"type":"point","x":-0.5,"y":-0.8660254037844386,"z":0,"label":"D","constraints":[]}],"opts":{"x":[-2.4,2.4],"y":[-2.4,2.4],"z":[-2.4,2.4],"grid":48,"alpha":0.62}}</script>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2+y^2+(z-1.41421356237)^2=0.75","display":"球 · 球心 A · r = sqrt(3)/2","constraints":[]},{"type":"implicit","expr":"(x-1)^2+y^2+z^2=0.75","display":"球 · 球心 B · r = sqrt(3)/2","constraints":[]},{"type":"implicit","expr":"(x+0.5)^2+(y-0.866025403784)^2+z^2=0.75","display":"球 · 球心 C · r = sqrt(3)/2","constraints":[]},{"type":"implicit","expr":"(x+0.5)^2+(y+0.866025403784)^2+z^2=0.75","display":"球 · 球心 D · r = sqrt(3)/2","constraints":[]},{"type":"segment","a":{"x":0,"y":0,"z":1.4142135623730951},"b":{"x":1,"y":0,"z":0},"label":"","constraints":[]},{"type":"segment","a":{"x":0,"y":0,"z":1.4142135623730951},"b":{"x":-0.5,"y":0.8660254037844386,"z":0},"label":"","constraints":[]},{"type":"segment","a":{"x":0,"y":0,"z":1.4142135623730951},"b":{"x":-0.5,"y":-0.8660254037844386,"z":0},"label":"","constraints":[]},{"type":"segment","a":{"x":1,"y":0,"z":0},"b":{"x":-0.5,"y":0.8660254037844386,"z":0},"label":"","constraints":[]},{"type":"segment","a":{"x":1,"y":0,"z":0},"b":{"x":-0.5,"y":-0.8660254037844386,"z":0},"label":"","constraints":[]},{"type":"segment","a":{"x":-0.5,"y":0.8660254037844386,"z":0},"b":{"x":-0.5,"y":-0.8660254037844386,"z":0},"label":"","constraints":[]},{"type":"point","x":0,"y":0,"z":1.4142135623730951,"label":"A","constraints":[]},{"type":"point","x":1,"y":0,"z":0,"label":"B","constraints":[]},{"type":"point","x":-0.5,"y":0.8660254037844386,"z":0,"label":"C","constraints":[]},{"type":"point","x":-0.5,"y":-0.8660254037844386,"z":0,"label":"D","constraints":[]}],"opts":{"x":[-2.4,2.4],"y":[-2.4,2.4],"z":[-2.4,2.4],"grid":48,"alpha":0.62}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>point(0, 0, sqrt(2)) A
 point(1, 0, 0) B
 point(-1/2, sqrt(3)/2, 0) C
@@ -618,7 +618,7 @@ x^2 + y^2 + z^2 = 3
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"polygon","points":[{"x":1,"y":1,"z":1},{"x":1,"y":-1,"z":-1},{"x":-1,"y":1,"z":-1}],"constraints":[]},{"type":"polygon","points":[{"x":1,"y":1,"z":1},{"x":1,"y":-1,"z":-1},{"x":-1,"y":-1,"z":1}],"constraints":[]},{"type":"polygon","points":[{"x":1,"y":1,"z":1},{"x":-1,"y":1,"z":-1},{"x":-1,"y":-1,"z":1}],"constraints":[]},{"type":"polygon","points":[{"x":1,"y":-1,"z":-1},{"x":-1,"y":1,"z":-1},{"x":-1,"y":-1,"z":1}],"constraints":[]},{"type":"segment","a":{"x":1,"y":1,"z":1},"b":{"x":1,"y":-1,"z":-1},"constraints":[]},{"type":"segment","a":{"x":1,"y":1,"z":1},"b":{"x":-1,"y":1,"z":-1},"constraints":[]},{"type":"segment","a":{"x":1,"y":1,"z":1},"b":{"x":-1,"y":-1,"z":1},"constraints":[]},{"type":"segment","a":{"x":1,"y":-1,"z":-1},"b":{"x":-1,"y":1,"z":-1},"constraints":[]},{"type":"segment","a":{"x":1,"y":-1,"z":-1},"b":{"x":-1,"y":-1,"z":1},"constraints":[]},{"type":"segment","a":{"x":-1,"y":1,"z":-1},"b":{"x":-1,"y":-1,"z":1},"constraints":[]},{"type":"point","x":1,"y":1,"z":1,"label":"A","constraints":[]},{"type":"point","x":1,"y":-1,"z":-1,"label":"B","constraints":[]},{"type":"point","x":-1,"y":1,"z":-1,"label":"C","constraints":[]},{"type":"point","x":-1,"y":-1,"z":1,"label":"D","constraints":[]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":46,"alpha":0.4}}</script>
+  <script type="application/json">{"items":[{"type":"polygon","points":[{"x":1,"y":1,"z":1},{"x":1,"y":-1,"z":-1},{"x":-1,"y":1,"z":-1}],"constraints":[]},{"type":"polygon","points":[{"x":1,"y":1,"z":1},{"x":1,"y":-1,"z":-1},{"x":-1,"y":-1,"z":1}],"constraints":[]},{"type":"polygon","points":[{"x":1,"y":1,"z":1},{"x":-1,"y":1,"z":-1},{"x":-1,"y":-1,"z":1}],"constraints":[]},{"type":"polygon","points":[{"x":1,"y":-1,"z":-1},{"x":-1,"y":1,"z":-1},{"x":-1,"y":-1,"z":1}],"constraints":[]},{"type":"segment","a":{"x":1,"y":1,"z":1},"b":{"x":1,"y":-1,"z":-1},"label":"","constraints":[]},{"type":"segment","a":{"x":1,"y":1,"z":1},"b":{"x":-1,"y":1,"z":-1},"label":"","constraints":[]},{"type":"segment","a":{"x":1,"y":1,"z":1},"b":{"x":-1,"y":-1,"z":1},"label":"","constraints":[]},{"type":"segment","a":{"x":1,"y":-1,"z":-1},"b":{"x":-1,"y":1,"z":-1},"label":"","constraints":[]},{"type":"segment","a":{"x":1,"y":-1,"z":-1},"b":{"x":-1,"y":-1,"z":1},"label":"","constraints":[]},{"type":"segment","a":{"x":-1,"y":1,"z":-1},"b":{"x":-1,"y":-1,"z":1},"label":"","constraints":[]},{"type":"point","x":1,"y":1,"z":1,"label":"A","constraints":[]},{"type":"point","x":1,"y":-1,"z":-1,"label":"B","constraints":[]},{"type":"point","x":-1,"y":1,"z":-1,"label":"C","constraints":[]},{"type":"point","x":-1,"y":-1,"z":1,"label":"D","constraints":[]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":46,"alpha":0.4}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>point(1, 1, 1) A
 point(1, -1, -1) B
 point(-1, 1, -1) C
@@ -649,7 +649,7 @@ segment(C, D)
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"polygon","points":[{"x":1,"y":1,"z":1},{"x":-1,"y":1,"z":0},{"x":0,"y":0,"z":0}],"constraints":[]},{"type":"segment","a":{"x":0,"y":0,"z":0},"b":{"x":1,"y":1,"z":1},"constraints":[]},{"type":"segment","a":{"x":0,"y":0,"z":0},"b":{"x":-1,"y":1,"z":0},"constraints":[]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":46,"alpha":1}}</script>
+  <script type="application/json">{"items":[{"type":"polygon","points":[{"x":1,"y":1,"z":1},{"x":-1,"y":1,"z":0},{"x":0,"y":0,"z":0}],"constraints":[]},{"type":"segment","a":{"x":0,"y":0,"z":0},"b":{"x":1,"y":1,"z":1},"label":"","constraints":[]},{"type":"segment","a":{"x":0,"y":0,"z":0},"b":{"x":-1,"y":1,"z":0},"label":"","constraints":[]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":46,"alpha":1}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>segment((0, 0, 0), (1, 1, 1))
 segment((0, 0, 0), (-1, 1, 0))
 polygon((1, 1, 1), (-1, 1, 0), (0, 0, 0))
@@ -669,7 +669,7 @@ polygon((1, 1, 1), (-1, 1, 0), (0, 0, 0))
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":["z > 0"]},{"type":"segment","a":{"x":0,"y":0,"z":-1.5},"b":{"x":0,"y":0,"z":1.5},"constraints":["z > 0","z > 0"]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":32,"alpha":1}}</script>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":["z > 0"]},{"type":"segment","a":{"x":0,"y":0,"z":-1.5},"b":{"x":0,"y":0,"z":1.5},"label":"","constraints":["z > 0","z > 0"]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":32,"alpha":1}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 + z^2 = 1
 z &gt; 0
 segment((0, 0, -1.5), (0, 0, 1.5)) where z &gt; 0
@@ -688,7 +688,7 @@ segment((0, 0, -1.5), (0, 0, 1.5)) where z &gt; 0
     </span>
   </div>
   <div class="plot-stage"><canvas></canvas></div>
-  <script type="application/json">{"items":[{"type":"polygon","points":[{"x":0,"y":0,"z":0},{"x":3,"y":0,"z":0},{"x":0,"y":3,"z":0}],"constraints":[]},{"type":"segment","a":{"x":3,"y":0,"z":0},"b":{"x":0,"y":3,"z":0},"constraints":[]},{"type":"segment","a":{"x":0,"y":0,"z":0},"b":{"x":1.5,"y":1.5,"z":0},"constraints":[]},{"type":"point","x":0,"y":0,"z":0,"label":"O","constraints":[]},{"type":"point","x":3,"y":0,"z":0,"label":"A","constraints":[]},{"type":"point","x":0,"y":3,"z":0,"label":"B","constraints":[]},{"type":"point","x":1.5,"y":1.5,"z":0,"label":"M","constraints":[]}],"region":[],"opts":{"x":[-1,4],"y":[-1,4],"samples":900}}</script>
+  <script type="application/json">{"items":[{"type":"polygon","points":[{"x":0,"y":0,"z":0},{"x":3,"y":0,"z":0},{"x":0,"y":3,"z":0}],"constraints":[]},{"type":"segment","a":{"x":3,"y":0,"z":0},"b":{"x":0,"y":3,"z":0},"label":"","constraints":[]},{"type":"segment","a":{"x":0,"y":0,"z":0},"b":{"x":1.5,"y":1.5,"z":0},"label":"","constraints":[]},{"type":"point","x":0,"y":0,"z":0,"label":"O","constraints":[]},{"type":"point","x":3,"y":0,"z":0,"label":"A","constraints":[]},{"type":"point","x":0,"y":3,"z":0,"label":"B","constraints":[]},{"type":"point","x":1.5,"y":1.5,"z":0,"label":"M","constraints":[]}],"region":[],"opts":{"x":[-1,4],"y":[-1,4],"samples":900}}</script>
   <details class="plot-src"><summary>表达式</summary><pre>point(0, 0) O
 point(3, 0) A
 point(0, 3) B
@@ -699,6 +699,51 @@ segment(O, M)
 </pre></details>
 </div>
 
+<h3 id="有向线段-箭头"><a href="#有向线段-箭头" class="headerlink" title="有向线段(箭头)"></a>有向线段(箭头)</h3><p>要画<strong>带方向的</strong>线段 —— 向量、受力、速度、法向、棱上的定向 —— 就写 <code>arrow(起点, 终点)</code>,<br>2D 和 3D 都支持,<code>vector(...)</code> 是同义词:</p>
+<div class="plot" data-kind="2d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">2D · 1 条线段 + 2 条有向线段</span>
+    <span class="plot-hint">滚轮缩放 · 拖动平移 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"segment","a":{"x":0,"y":0,"z":0},"b":{"x":3,"y":0,"z":0},"label":"","constraints":[]},{"type":"arrow","a":{"x":0,"y":0,"z":0},"b":{"x":3,"y":1,"z":0},"label":"v","constraints":[]},{"type":"arrow","a":{"x":0,"y":0,"z":0},"b":{"x":1,"y":3,"z":0},"label":"F","constraints":[]}],"region":[],"opts":{"x":[-1,4],"y":[-1,4],"samples":900}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>arrow((0, 0), (3, 1)) v
+arrow((0, 0), (1, 3)) F
+segment((0, 0), (3, 0))
+</pre></details>
+</div>
+
+<ul>
+<li>箭头画在<strong>终点</strong>那一头,方向就是起点 → 终点;</li>
+<li>箭头那根线是<strong>青色</strong>,普通线段是金色 —— 一张图里混着画也一眼能分清哪条有方向;</li>
+<li>箭头大小按<strong>屏幕像素</strong>算,所以缩放、宽高比、透视怎么变它都不变形(按数学坐标算的话,放大 100 倍箭头就只剩一条缝了);</li>
+<li>括号后面可以跟个标签,画在中点旁边:<code>arrow(A, B) v</code>(和 <code>point(1,2) P</code> 同一个写法);</li>
+<li>顶点写法和线段完全一样:引标签 <code>arrow(O, A)</code> 或直接给坐标 <code>arrow((0,0), (1,1))</code>,也支持 <code>where</code>。</li>
+</ul>
+<p>3D 里也一样。下面这个球 + 两个箭头,竖着那个被 <code>where</code> 切掉了下半截:</p>
+<div class="plot" data-kind="3d" data-mount>
+  <div class="plot-bar">
+    <span class="plot-kind">3D 等值面 · x^2 + y^2 + z^2 = 1 · 半透明 35% · 2 条有向线段</span>
+    <span class="plot-hint">拖动旋转 · 滚轮缩放 · 双击重置</span>
+    <span class="plot-actions">
+      <button type="button" data-plot-action="reset">重置</button>
+      <button type="button" data-plot-action="alpha" aria-pressed="false">半透明</button>
+      <button type="button" data-plot-action="save">存为 PNG</button>
+    </span>
+  </div>
+  <div class="plot-stage"><canvas></canvas></div>
+  <script type="application/json">{"items":[{"type":"implicit","expr":"x^2 + y^2 + z^2 = 1","constraints":[]},{"type":"arrow","a":{"x":0,"y":0,"z":0},"b":{"x":1,"y":1,"z":1},"label":"d","constraints":[]},{"type":"arrow","a":{"x":0,"y":0,"z":-1},"b":{"x":0,"y":0,"z":1},"label":"","constraints":["z > 0"]}],"opts":{"x":[-2,2],"y":[-2,2],"z":[-2,2],"grid":34,"alpha":0.35}}</script>
+  <details class="plot-src"><summary>表达式</summary><pre>x^2 + y^2 + z^2 = 1
+arrow((0, 0, 0), (1, 1, 1)) d
+arrow((0, 0, -1), (0, 0, 1)) where z &gt; 0
+</pre></details>
+</div>
+
+<p>3D 的箭头同样走”切成十几小段分别按深度排序”那套,所以穿过球的那一段遮挡关系是对的;<br>箭头本身<strong>只画一次</strong>,画在可见部分的末端 —— 被 <code>where</code> 切掉尾巴时,它会停在切口那里,而不是跟着尾巴一起消失。</p>
 <h3 id="两种方程背后是两套完全不同的算法"><a href="#两种方程背后是两套完全不同的算法" class="headerlink" title="两种方程背后是两套完全不同的算法"></a>两种方程背后是两套完全不同的算法</h3><table>
 <thead>
 <tr>
@@ -817,6 +862,7 @@ segment(O, M)
 </div>
 
 <p>这样两个轴的跨度都会变成 8 —— 圆在任何情况下都不会被压扁,但纵向空白也会变多。这是几何决定的,不是渲染器偷懒。</p>
+<p><strong>整块只有点、线段、箭头、多边形的时候,x 和 y 会一起自动取景,而且取成同一个单位长度</strong><br>(画布比例跟着内容走)。所以 <code>arrow((0, 0), (1, 1))</code> 单独一行就是一条好看的 45° 箭头,<br>而不是缩在默认窗口角落里、还被拉斜的一条线。图形自带范围时当然还是以你写的为准。</p>
 <p>(注意 <code>equal=1</code> 是<strong>选项</strong>,要写在 <code>```plot2d</code> 那一行的末尾,不能当成正文的一行 ——<br>写成正文会被当成表达式,构建时会提醒你。)</p>
 <h2 id="约束条件-把图形裁成你想要的那一块"><a href="#约束条件-把图形裁成你想要的那一块" class="headerlink" title="约束条件:把图形裁成你想要的那一块"></a>约束条件:把图形裁成你想要的那一块</h2><p><strong>只要一行里出现 <code>&lt;</code> <code>&gt;</code> <code>&lt;=</code> <code>&gt;=</code>,它就自动被当成约束条件</strong> —— 约束会裁掉其他所有图形(曲线、方程、曲面)落在区域外的部分。不需要什么新语法。</p>
 <p>上半球,一行搞定:</p>
@@ -1275,7 +1321,7 @@ RSS / Atom</a></li>
   <script src="/js/main.js?v=d1a1ba9a"></script>
   
   <!-- 只有含函数图像的页面才加载绘图代码 -->
-  <script src="/js/plot.js?v=ba4fca01"></script>
+  <script src="/js/plot.js?v=1138d22f"></script>
   
 </body>
 </html>
