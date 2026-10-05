@@ -262,6 +262,115 @@ console.log('\n=== 隐式曲线 + 区域背景 ===');
   ok('等值线段数量足够', record.moves.length > 100, `${record.moves.length} 段`);
 }
 
+console.log('\n=== 2D 有向线段(箭头) ===');
+{
+  const ARROW = '#2ee6ff'; // 箭头用的青色,好和普通线段(金色)区分
+  const line = (record) => record.shapes.filter((s) => s.kind === 'stroke' && s.style === ARROW);
+  const heads = (record) => record.shapes.filter((s) => s.kind === 'fill' && s.style === ARROW);
+  const tri = (sh) => sh.path.filter((e) => e[0] === 'm' || e[0] === 'l').map((e) => [e[1], e[2]]);
+
+  const { record, el } = render('2d', {
+    items: [
+      { type: 'arrow', a: { x: -2, y: 0, z: 0 }, b: { x: 2, y: 0, z: 0 }, label: 'v', constraints: [] },
+      { type: 'segment', a: { x: -2, y: -1, z: 0 }, b: { x: 2, y: -1, z: 0 }, label: '', constraints: [] },
+    ],
+    region: [],
+    opts: { x: [-3, 3], y: [-2, 2], samples: 200 },
+  });
+  ok('没有报错', !el.dataset.error, errText(record));
+
+  ok('箭头用青色画(和普通线段区分)', line(record).length === 1, `${line(record).length} 条`);
+  ok('普通线段还是金色', record.shapes.some((s) => s.kind === 'stroke' && s.style === '#ffd166'));
+  ok('普通线段没有箭头', heads(record).length === 1, `${heads(record).length} 个箭头`);
+
+  const pts = tri(heads(record)[0]);
+  ok('箭头是三角形', pts.length === 3, `${pts.length} 个顶点`);
+  // 尖端在终点那一头(这条箭头朝右,所以尖端 x 最大)
+  const tipX = pts[0][0];
+  const baseX = (pts[1][0] + pts[2][0]) / 2;
+  ok('尖端落在终点', tipX > baseX + 4, `尖端 ${tipX.toFixed(1)} vs 底边 ${baseX.toFixed(1)}`);
+  const size = Math.hypot(pts[0][0] - baseX, pts[0][1] - (pts[1][1] + pts[2][1]) / 2);
+  ok('箭头是屏幕像素级大小(5~14px)', size >= 5 && size <= 14, `${size.toFixed(1)}px`);
+  const halfWidth = Math.abs(pts[1][1] - pts[2][1]) / 2;
+  ok('三角形有宽度(不是一条缝)', halfWidth > 1.5, `${halfWidth.toFixed(1)}px`);
+
+  const label = record.texts.find((t) => t[0] === 'v');
+  ok('标签画出来了', !!label);
+  if (label) {
+    // 线在 y=0 那条上,标签应该被顶到线的一侧而不是压在线上
+    const lineY = record.shapes.find((s) => s.kind === 'stroke' && s.style === ARROW).path[0][2];
+    ok('标签偏在线的一侧', Math.abs(label[2] - lineY) > 6, `Δy=${Math.abs(label[2] - lineY).toFixed(1)}`);
+  }
+
+  // 竖着的箭头:尖端要在终点那一头(屏幕坐标 y 向下,所以朝上的箭头尖端 y 更小)
+  const up = render('2d', {
+    items: [{ type: 'arrow', a: { x: 0, y: -1, z: 0 }, b: { x: 0, y: 2, z: 0 }, constraints: [] }],
+    region: [],
+    opts: { x: [-2, 2], y: [-2, 3], samples: 200 },
+  });
+  const upTri = tri(heads(up.record)[0]);
+  const upBaseY = (upTri[1][1] + upTri[2][1]) / 2;
+  ok('朝上的箭头尖端在上方', upTri[0][1] < upBaseY - 4, `尖端 y=${upTri[0][1].toFixed(1)} vs 底边 ${upBaseY.toFixed(1)}`);
+
+  // 被 where 整条去掉时不该留下箭头
+  const gone = render('2d', {
+    items: [{ type: 'arrow', a: { x: -1, y: 0, z: 0 }, b: { x: 1, y: 0, z: 0 }, constraints: ['y > 5'] }],
+    region: [],
+    opts: { x: [-2, 2], y: [-2, 2], samples: 200 },
+  });
+  ok('where 判掉整条时箭头也不画', heads(gone.record).length === 0, `${heads(gone.record).length} 个`);
+}
+
+console.log('\n=== 3D 有向线段(箭头) ===');
+{
+  const ARROW = '#2ee6ff';
+  const heads = (record) => record.shapes.filter((s) => s.kind === 'fill' && s.style === ARROW);
+  const lines = (record) => record.shapes.filter((s) => s.kind === 'stroke' && s.style === ARROW);
+
+  const { record, el } = render('3d', {
+    items: [
+      { type: 'implicit', expr: 'x^2+y^2+z^2=1', constraints: [] },
+      { type: 'arrow', a: { x: -1.5, y: -1.5, z: -1.5 }, b: { x: 1.5, y: 1.5, z: 1.5 }, label: 'd', constraints: [] },
+    ],
+    opts: { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 14, alpha: 1 },
+  });
+  ok('没有报错', !el.dataset.error, errText(record));
+  ok('线按深度切成了多段(逐段遮挡)', lines(record).length > 4, `${lines(record).length} 段`);
+  ok('箭头只画一个(不是每段都画)', heads(record).length === 1, `${heads(record).length} 个`);
+  ok('3D 标签也画出来了', record.texts.some((t) => t[0] === 'd'));
+
+  // where 把后半截切掉:箭头应该停在可见部分的末端,而不是整根消失
+  const clipped = render('3d', {
+    items: [{ type: 'arrow', a: { x: 0, y: 0, z: -1.5 }, b: { x: 0, y: 0, z: 1.5 }, constraints: ['z > 0'] }],
+    opts: { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 8, alpha: 1 },
+  });
+  ok('没有报错(只有箭头)', !clipped.el.dataset.error, errText(clipped.record));
+  ok('被 where 切掉后半截,箭头仍在可见末端', heads(clipped.record).length === 1,
+    `${heads(clipped.record).length} 个`);
+  // 切掉之后应该还剩一段线(而不是整条消失)—— 这条同时钉住了"3D 里 where 用数学坐标判定"
+  ok('被 where 切掉后线还在(不是整条消失)', lines(clipped.record).length > 1,
+    `${lines(clipped.record).length} 段`);
+
+  // 回归:3D 的 where 曾经拿渲染坐标(轴被重排成 x,z,y)去判定,于是 `where z > 0`
+  // 实际比的是 y —— 文章里那个 `segment((0,0,-1.5),(0,0,1.5)) where z > 0` 会整条不见。
+  const kept = render('3d', {
+    items: [{ type: 'segment', a: { x: 0, y: 0, z: -1.5 }, b: { x: 0, y: 0, z: 1.5 }, constraints: ['z > 0'] }],
+    opts: { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 8, alpha: 1 },
+  });
+  const keptSegs = kept.record.shapes.filter((s) => s.kind === 'stroke' && s.style === '#ffd166');
+  ok('3D 线段 + where z > 0 保住了上半截', keptSegs.length > 3, `${keptSegs.length} 段`);
+  const allY = keptSegs.flatMap((s) => s.path.filter((e) => e[0] === 'm' || e[0] === 'l').map((e) => e[2]));
+  ok('留下的是上半截(屏幕上更靠上)', allY.length > 0 && Math.max(...allY) <= 500,
+    `y 范围 ${Math.min(...allY).toFixed(0)}~${Math.max(...allY).toFixed(0)}`);
+
+  const dropped = render('3d', {
+    items: [{ type: 'segment', a: { x: 0, y: 0, z: -1.5 }, b: { x: 0, y: 0, z: 1.5 }, constraints: ['z < 0'] }],
+    opts: { x: [-2, 2], y: [-2, 2], z: [-2, 2], grid: 8, alpha: 1 },
+  });
+  ok('反过来 where z < 0 留下的是另一半',
+    dropped.record.shapes.filter((s) => s.kind === 'stroke' && s.style === '#ffd166').length > 3);
+}
+
 console.log('\n=== 第一帧就完整可见(自动适配镜头) ===');
 {
   // 用户的原话:「空间过小导致没显示完全」。六方最密堆积那 17 个球铺满整个包围盒,

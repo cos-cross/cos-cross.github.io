@@ -787,5 +787,74 @@ ok('t=0 是青色', Kit.colormap(0) === 'rgb(46,230,255)', Kit.colormap(0));
 ok('t=1 是粉色', Kit.colormap(1) === 'rgb(255,95,208)', Kit.colormap(1));
 ok('超出范围会被夹住', Kit.colormap(5) === Kit.colormap(1) && Kit.colormap(-3) === Kit.colormap(0));
 
+console.log('\n=== 代码块语法:segment / arrow(scripts/plot.js) ===');
+{
+  // 代码块语法这一层以前只能靠构建产物间接验证(改坏了不好发现),
+  // 加了 arrow 之后顺手把这条链路钉住:代码块 → 解析 → payload。
+  const Plugin = require(path.join(root, 'scripts', 'plot.js'));
+  const build = (kind, code, optsRaw) => {
+    Plugin.takeProblems();
+    const html = Plugin.buildPlotBlock(kind, Plugin.parseOptions(optsRaw || ''), code, 'test.md');
+    const problems = Plugin.takeProblems();
+    const payload = html
+      ? JSON.parse(/<script type="application\/json">([\s\S]*?)<\/script>/.exec(html)[1])
+      : null;
+    return { html, problems, payload };
+  };
+  const arrowsOf = (r) => (r.payload ? r.payload.items.filter((it) => it.type === 'arrow') : []);
+  const kinds = (r) => (r.payload ? r.payload.items.map((it) => it.type).join(',') : '(没画出来)');
+
+  let r = build('2d', 'arrow((0,0), (1,2))');
+  ok('2D 解析出 arrow 条目', arrowsOf(r).length === 1, kinds(r));
+  ok('端点坐标对得上', (() => {
+    const a = arrowsOf(r)[0];
+    return a && a.a.x === 0 && a.a.y === 0 && a.b.x === 1 && a.b.y === 2;
+  })(), JSON.stringify(arrowsOf(r)[0] || null));
+
+  r = build('2d', 'arrow((0,0), (2,0)) v');
+  ok('右括号后面的标签会带上', !!arrowsOf(r)[0] && arrowsOf(r)[0].label === 'v',
+    String(arrowsOf(r)[0] && arrowsOf(r)[0].label));
+
+  r = build('2d', 'point(0,0) O\npoint(3,4) A\narrow(O, A) OA');
+  ok('端点可以引用点的标签', (() => {
+    const a = arrowsOf(r)[0];
+    return a && a.a.x === 0 && a.b.x === 3 && a.b.y === 4 && a.label === 'OA';
+  })(), kinds(r));
+
+  r = build('2d', 'vector((0,0), (1,0))');
+  ok('vector 是 arrow 的同义词', arrowsOf(r).length === 1, kinds(r));
+
+  r = build('2d', 'arrow((0,0), (1,0)) where y > 0');
+  ok('where 会进 constraints', JSON.stringify(arrowsOf(r)[0].constraints) === '["y > 0"]',
+    JSON.stringify(arrowsOf(r)[0].constraints));
+
+  r = build('3d', 'arrow((0,0,0), (1,1,1))');
+  ok('3D 也支持,三个坐标都在', (() => {
+    const a = arrowsOf(r)[0];
+    return a && a.b.x === 1 && a.b.y === 1 && a.b.z === 1;
+  })(), kinds(r));
+
+  r = build('2d', 'segment((0,0), (1,0))\narrow((0,0), (0,1))');
+  ok('arrow 和 segment 能共存', kinds(r) === 'segment,arrow', kinds(r));
+  ok('块标题里线段和有向线段分开数',
+    /1 条线段/.test(r.html || '') && /1 条有向线段/.test(r.html || ''), '');
+
+  r = build('2d', 'arrow((0,0), (1,1))', 'x=[-3,3] y=[-2,2]');
+  ok('作者写了范围就用作者的', r.payload.opts.x[0] === -3 && r.payload.opts.y[1] === 2,
+    JSON.stringify(r.payload.opts));
+  r = build('2d', 'arrow((0,0), (1,1))');
+  ok('只有箭头时自动取景到图形附近(不是默认的 [-10,10])', r.payload.opts.x[1] < 4,
+    JSON.stringify(r.payload.opts.x));
+
+  r = build('2d', 'arrow((0,0), (1,1), (2,2))');
+  ok('三个端点会报错', r.html === null && r.problems.some((p) => /正好两个端点/.test(p)),
+    r.problems.join(' / '));
+  r = build('2d', 'arrow((1,1), (1,1))');
+  ok('两个端点重合会报错', r.problems.some((p) => /重合/.test(p)), r.problems.join(' / '));
+  r = build('2d', 'arrow(A, B)');
+  ok('引用不存在的标签时报错并列出已有点', r.problems.some((p) => /找不到名为「A」的点/.test(p)),
+    r.problems.join(' / '));
+}
+
 console.log(`\n${pass} 通过,${fail} 失败`);
 process.exit(fail ? 1 : 0);
